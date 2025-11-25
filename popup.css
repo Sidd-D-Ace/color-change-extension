@@ -1,33 +1,163 @@
-:root {
-  font-family: system-ui, Arial, sans-serif;
-  font-size: 14px;
+:root{
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  font-size: 15px;
   color: #111;
   background: #fff;
 }
 
-body { margin: 8px; padding: 0; }
-h1 { font-size: 18px; margin: 0 0 8px 0; }
-p { margin: 8px 0; }
+body {
+  margin: 10px;
+  padding: 0;
+  width: 460px; /* increased popup width from 420 → 460 */
+}
+
+h1 {
+  font-size: 18px;
+  margin: 0 0 6px 0;
+  font-weight: 700;
+}
+
+#desc {
+  font-size: 13px;
+  margin: 6px 0 10px 0;
+  color: #333;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 8px;
+  table-layout: fixed;
+  margin-bottom: 10px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
 }
-th, td {
-  border: 1px solid #222;
-  padding: 6px;
+
+thead th {
+  font-size: 13px;
+  background: #f5f6f7;
+  padding: 8px 6px;
   text-align: left;
+  border-bottom: 1px solid #e0e0e0;
 }
-input[type="text"]{
-  width: 100%;
+
+tbody tr:nth-child(odd) { background: #fafafa; }
+tbody tr:nth-child(even) { background: #fff; }
+
+td {
   padding: 6px;
-  font-size: 14px;
+  vertical-align: middle;
+  border-bottom: 1px solid #eee;
+  font-size: 13px;
 }
-.controls { display:flex; gap:8px; margin-bottom: 8px; }
-button { padding: 6px 10px; font-size: 14px; cursor: pointer; }
-#helpShortcuts { background: #eee; }
-#saveBtn { background: #dff0d8; }
-#resetBtn { background: #f8d7da; }
-#announce, .sr-only { position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden; }
-#error { color: #a00; font-weight: bold; min-height: 1.2em; }
-.note { font-size: 12px; color: #555; }
+
+/* first column small */
+td:first-child {
+  width: 26px;
+  text-align:center;
+  font-weight:600;
+}
+
+/* --------- NEW WIDTH FIX HERE --------- */
+td:nth-child(4) {
+  width: 200px;     /* enough for long shortcuts */
+}
+
+td .shortcut {
+  width: 190px !important;
+  min-width: 190px !important;
+  max-width: 190px !important;
+
+  box-sizing: border-box;
+  text-align: center;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+
+  white-space: nowrap;         /* No wrapping */
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+table {
+  table-layout: auto !important;
+}
+/* --------- END NEW FIX --------- */
+
+/* inputs */
+input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  background: #fff;
+  outline: none;
+}
+
+input[type="text"]:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+}
+
+/* test button */
+button {
+  padding: 6px 8px;
+  font-size: 13px;
+  border-radius: 6px;
+  border: 1px solid #666;
+  background: #f2f2f2;
+  cursor: pointer;
+}
+
+button:focus { outline: 2px solid #3b82f6; }
+
+/* controls */
+.controls {
+  display:flex;
+  gap:8px;
+  margin-top: 8px;
+}
+
+.controls button { flex: 1; }
+
+/* error and announce region */
+#error {
+  color: #fff;
+  background: #c62828;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  display: none;
+  margin-top: 8px;
+}
+
+#error.visible { display: block; }
+
+#announce {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* highlighted duplicate rows */
+tr.duplicate td {
+  background: #fff0f0 !important;
+  border-left: 4px solid #d32f2f;
+}
+
+/* a calm \"saved\" message */
+.saved-notice {
+  color: #155724;
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  display: none;
+  margin-top: 8px;
+}
+.saved-notice.visible { display:block; }
