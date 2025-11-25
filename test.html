@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Buttons (10 Keys Test)</title>
+
+    <style>
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            color: white;
+            border: 2px solid black;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        .redBtn { background-color: red; }
+        .greenBtn { background-color: green; }
+        .blueBtn { background-color: blue; }
+        .yellowBtn { background-color: yellow; color: black; }
+        .magentaBtn { background-color: magenta; }
+        .cyanBtn { background-color: cyan; color: black; }
+        .orangeBtn { background-color: orange; }
+        .purpleBtn { background-color: purple; }
+        .brownBtn { background-color: brown; }
+        .blackBtn { background-color: black; }
+    </style>
+
+</head>
+<body>
+
+    <h2>Click a Button to Change Background Color</h2>
+
+    <button class="redBtn" onclick="changeColor('red')">Red</button>
+    <button class="greenBtn" onclick="changeColor('green')">Green</button>
+    <button class="blueBtn" onclick="changeColor('blue')">Blue</button>
+
+    <button class="yellowBtn" onclick="changeColor('yellow')">Yellow</button>
+    <button class="magentaBtn" onclick="changeColor('magenta')">Magenta</button>
+    <button class="cyanBtn" onclick="changeColor('cyan')">Cyan</button>
+    <button class="orangeBtn" onclick="changeColor('orange')">Orange</button>
+    <button class="purpleBtn" onclick="changeColor('purple')">Purple</button>
+    <button class="brownBtn" onclick="changeColor('brown')">Brown</button>
+    <button class="blackBtn" onclick="changeColor('black')">Black</button>
+
+    <script>
+        function changeColor(color) {
+            document.body.style.backgroundColor = color;
+        }
+    </script>
+
+</body>
+</html>
