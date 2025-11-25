@@ -167,7 +167,6 @@ function testRow(index) {
       ext.tabs.sendMessage(tabs[0].id, msg, (res) => {
         if (ext.runtime && ext.runtime.lastError) {
           // likely no content script or no response; try promise-style fallback
-          // Try promise form if supported
           try {
             const p = ext.tabs.sendMessage(tabs[0].id, msg);
             if (p && typeof p.then === "function") {
@@ -247,20 +246,14 @@ function startRecordingOnInput(input) {
 }
 
 // Stop recording; if save=true keep current value, otherwise restore previous
-    stopRecordingOnInput(active, true);
-    const tr = active.closest("tr");
-    if (tr) {
-      const next = tr.nextElementSibling;
-      if (next) {
-        const nextShortcut = next.querySelector(".shortcut");
-        if (nextShortcut) {
-          // avoid auto-starting recording on programmatic focus
-          nextShortcut.dataset.skipFocus = "1";
-          nextShortcut.focus();
-        }
-      }
-    }
-
+function stopRecordingOnInput(input, save) {
+  input.removeAttribute("data-recording");
+  input.classList.remove("recording");
+  if (!save && input._prevValue !== undefined) {
+    input.value = input._prevValue;
+  }
+  if (announce) announce.textContent = "";
+}
 
 // Attach per-input handlers that only toggle recording state (no global key listeners here)
 function enableShortcutRecording(input) {
@@ -291,7 +284,6 @@ function enableShortcutRecording(input) {
 
   input.addEventListener("paste", (e) => e.preventDefault());
 }
-
 
 // Attach recorders to all .shortcut inputs (call after rendering)
 function attachRecordersToAllShortcuts() {
@@ -344,14 +336,18 @@ window.addEventListener("keydown", function (e) {
     const combined = parts.slice();
     if (!combined.includes(normalizedMain)) combined.push(normalizedMain);
     active.value = combined.join("+");
-    // finalize and move focus to next shortcut input for convenience
+    // finalize and move focus to next shortcut input for convenience (but skip auto-record)
     stopRecordingOnInput(active, true);
     const tr = active.closest("tr");
     if (tr) {
       const next = tr.nextElementSibling;
       if (next) {
         const nextShortcut = next.querySelector(".shortcut");
-        if (nextShortcut) nextShortcut.focus();
+        if (nextShortcut) {
+          // set skipFocus so programmatic focus doesn't start recording
+          nextShortcut.dataset.skipFocus = "1";
+          nextShortcut.focus();
+        }
       }
     }
   }
