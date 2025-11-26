@@ -7,11 +7,12 @@
     "commands",
     "tabs",
     "storage",
-    "activeTab",
     "<all_urls>"
   ],
   "background": {
-    "scripts": ["background.js"],
+    "scripts": [
+      "background.js"
+    ],
     "persistent": false
   },
   "browser_action": {
@@ -20,29 +21,61 @@
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "keysight@example.com"
+      "id": "keysight@replace-this.com",
+      "strict_min_version": "58.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
     }
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content_script.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content_script.js"
+      ],
       "run_at": "document_idle"
     }
   ],
   "commands": {
-    "trigger-1": { "description": "Trigger 1" },
-    "trigger-2": { "description": "Trigger 2" },
-    "trigger-3": { "description": "Trigger 3" },
-    "trigger-4": { "description": "Trigger 4" },
-    "trigger-5": { "description": "Trigger 5" },
-    "trigger-6": { "description": "Trigger 6" },
-    "trigger-7": { "description": "Trigger 7" },
-    "trigger-8": { "description": "Trigger 8" },
-    "trigger-9": { "description": "Trigger 9" },
-    "trigger-10": { "description": "Trigger 10" },
+    "trigger-1": {
+      "description": "Trigger 1"
+    },
+    "trigger-2": {
+      "description": "Trigger 2"
+    },
+    "trigger-3": {
+      "description": "Trigger 3"
+    },
+    "trigger-4": {
+      "description": "Trigger 4"
+    },
+    "trigger-5": {
+      "description": "Trigger 5"
+    },
+    "trigger-6": {
+      "description": "Trigger 6"
+    },
+    "trigger-7": {
+      "description": "Trigger 7"
+    },
+    "trigger-8": {
+      "description": "Trigger 8"
+    },
+    "trigger-9": {
+      "description": "Trigger 9"
+    },
+    "trigger-10": {
+      "description": "Trigger 10"
+    },
     "open-settings": {
-      "suggested_key": { "default": "Ctrl+Shift+F" },
+      "suggested_key": {
+        "default": "Ctrl+Shift+F"
+      },
       "description": "Open KeySight settings"
     }
   }
