@@ -1,14 +1,12 @@
-// background.js (MV2 event page) - patched for Firefox + Chrome
-// Includes robust storage getter (handles promise-style and callback-style) and
-// auto-inject fallback: if content script isn't present in the active tab, inject it then resend.
-
-// Reference screenshot (local file URL): /mnt/data/3e254837-3328-4c88-a001-fcc36c6a4c0f.png
+// background.js (MV2 event page) - Shortcut Trigger
+// Handles keyboard commands and storage retrieval.
 
 const ext = (typeof browser !== "undefined") ? browser : chrome;
 
-console.log("[BG] background loaded (MV2 event page) - patched");
+console.log("[Shortcut Trigger BG] Background loaded.");
 
 // ---- Helpers ----
+// Note: colorName is preserved for internal accessibility labels in the popup
 function defaultMappings() {
   return [
     { colorName: "Red", selector: ".redBtn", shortcut: "Ctrl+Shift+1" },
@@ -29,6 +27,7 @@ function getSettings() {
   try {
     // Call storage.get — might return a Promise (Firefox) or undefined (Chrome)
     const maybe = ext.storage && ext.storage.sync && ext.storage.sync.get({ mappings: null });
+    
     if (maybe && typeof maybe.then === 'function') {
       return maybe.then(res => {
         return (res && res.mappings) ? res.mappings : defaultMappings();
@@ -62,33 +61,26 @@ function ensureContentScriptAndSend(tabId, payload) {
   try {
     ext.tabs.sendMessage(tabId, payload, (res) => {
       if (!(ext.runtime && ext.runtime.lastError)) {
-        // delivered
+        // delivered successfully
         return;
       }
-      const err = ext.runtime.lastError && ext.runtime.lastError.message;
-      console.warn('[BG] initial sendMessage error:', err);
+      // If failed, content script might not be there. Inject it.
+      // console.warn('[BG] Content script missing, injecting...');
 
-      // Attempt to inject content_script.js (may fail on some pages)
       try {
         ext.tabs.executeScript(tabId, { file: 'content_script.js' }, () => {
           if (ext.runtime && ext.runtime.lastError) {
-            console.warn('[BG] executeScript injection failed:', ext.runtime.lastError.message);
+            console.warn('[BG] Injection failed:', ext.runtime.lastError.message);
             return;
           }
-          // After injection, retry send
+          // Retry sending after injection
           try {
             ext.tabs.sendMessage(tabId, payload, (res2) => {
-              if (ext.runtime && ext.runtime.lastError) {
-                console.warn('[BG] message failed after injection:', ext.runtime.lastError.message);
-              }
+              /* ignore secondary errors */
             });
-          } catch (e2) {
-            console.warn('[BG] resend threw:', e2 && e2.message);
-          }
+          } catch (e2) { /* ignore */ }
         });
-      } catch (iex) {
-        console.warn('[BG] executeScript threw:', iex && iex.message);
-      }
+      } catch (iex) { /* ignore */ }
     });
   } catch (e) {
     console.warn('[BG] sendMessage threw:', e && e.message);
@@ -102,23 +94,23 @@ function sendMessageToActiveTab(payload) {
     ensureContentScriptAndSend(tabId, payload);
   });
 }
-// in background.js: send toggle to active tab
+
 function openSettingsOverlayOnPage() {
   try {
     ext.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs || !tabs[0]) return;
       const tabId = tabs[0].id;
-      // send a message; handle both callback and promise styles
+      
+      // Send toggle message
       try {
         const maybe = ext.tabs.sendMessage(tabId, { action: "toggle_overlay" });
         if (maybe && typeof maybe.then === "function") {
-          maybe.catch(() => { /* no-op */ });
+          maybe.catch(() => {});
         }
       } catch (e) {
-        // fallback: try promise form (rare)
         try {
           ext.tabs.sendMessage(tabId, { action: "toggle_overlay" }).catch(()=>{});
-        } catch (_) { /* ignore */ }
+        } catch (_) {}
       }
     });
   } catch (err) {
@@ -127,45 +119,36 @@ function openSettingsOverlayOnPage() {
 }
 
 
-
-
 // ---- Main command listener ----
 ext.commands && ext.commands.onCommand.addListener((command) => {
-  console.log("[BG] command:", command);
-
-if (command === "open-settings") {
-  console.log("[BG] open-settings triggered; asking active tab to toggle overlay");
-  openSettingsOverlayOnPage();
-  return;
-}
-
-
-
-  // existing trigger logic...
-
-  console.log("[BG] command:", command);
+  
+  if (command === "open-settings") {
+    console.log("[BG] Opening settings overlay");
+    openSettingsOverlayOnPage();
+    return;
+  }
 
   const idx = commandToIndex(command);
   if (idx === -1) return;
 
-  // getSettings returns a Promise
+  console.log("[BG] Command Trigger:", idx + 1);
+
   getSettings().then((mappings) => {
     const map = mappings[idx] || {};
     const payload = {
       action: "trigger",
-      index: idx,
+      index: idx, // Content script uses this for "First/Second" announcement
       colorName: map.colorName || "",
       selector: map.selector || null,
       from: "background"
     };
 
-    console.log('[BG] sending payload:', payload);
     sendMessageToActiveTab(payload);
   }).catch((err) => {
-    console.error('[BG] error reading settings:', err && err.message);
+    console.error('[BG] Error reading settings:', err && err.message);
   });
 });
 
 ext.runtime && ext.runtime.onInstalled && ext.runtime.onInstalled.addListener(() => {
-  console.log('[BG] Extension installed or updated.');
+  console.log('[Shortcut Trigger BG] Extension installed/updated.');
 });

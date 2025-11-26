@@ -154,8 +154,8 @@ window.addEventListener("load", () => {
 /* ==========================================================================
    5. SETTINGS OVERLAY UI
    ========================================================================== */
-const OVERLAY_ID = 'color-trigger-overlay';
-const IFRAME_ID = 'color-trigger-iframe';
+const OVERLAY_ID = 'shortcut-trigger-overlay';
+const IFRAME_ID = 'shortcut-trigger-iframe';
 
 function createOverlay() {
   if (document.getElementById(OVERLAY_ID)) {
@@ -178,7 +178,8 @@ function createOverlay() {
     .ct-frame { width: 100%; height: 100%; border: 0; }
     .ct-close {
       position: absolute; right: 10px; top: 10px;
-      background: #f1f1f1; border: 1px solid #ccc;
+      background: #000000ff; color: #fff; /* Added white text for visibility */
+      border: 1px solid #ccc;
       padding: 5px 10px; border-radius: 4px; cursor: pointer;
       font-family: sans-serif; font-size: 13px; font-weight: bold;
       z-index: 2147483648;
@@ -194,7 +195,7 @@ function createOverlay() {
   container.id = OVERLAY_ID;
   container.setAttribute('role', 'dialog');
   container.setAttribute('aria-modal', 'true');
-  container.setAttribute('aria-label', 'Color Trigger Settings');
+  container.setAttribute('aria-label', 'Shortcut Trigger Settings');
 
   const closeBtn = document.createElement('button');
   closeBtn.className = 'ct-close';

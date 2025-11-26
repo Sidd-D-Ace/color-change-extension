@@ -16,7 +16,7 @@
   },
   "browser_action": {
     "default_popup": "popup.html",
-    "default_title": "Color Trigger — settings"
+    "default_title": "Shortcut Trigger Settings"
   },
   "browser_specific_settings": {
     "gecko": {
