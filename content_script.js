@@ -1,14 +1,13 @@
-/* content_script.js - Shortcuts + Settings Overlay (No Announcements, Run-Once Guard) */
+/* content_script.js - KeySight: Shortcuts + Settings Overlay */
 const ext = (typeof browser !== "undefined") ? browser : chrome;
 
-// --- GUARD: Prevent double-injection which causes screen readers to read Title twice ---
-if (window.hasColorTriggerRun) {
-  // console.log("[Color Trigger] Script already loaded. Skipping.");
-  throw new Error("Color Trigger content script already exists"); // Safely exit
+// --- GUARD: Prevent double-injection ---
+if (window.hasKeySightRun) {
+  throw new Error("KeySight content script already exists"); 
 }
-window.hasColorTriggerRun = true;
+window.hasKeySightRun = true;
 
-console.log("[Color Trigger] Content script loaded.");
+console.log("[KeySight] Content script loaded.");
 
 let storedMappings = [];
 
@@ -28,7 +27,7 @@ ext.storage.onChanged.addListener((changes) => {
 
 
 /* ==========================================================================
-   2. KEYBOARD LISTENER (Shortcuts)
+   2. KEYBOARD LISTENER
    ========================================================================== */
 function getKeyName(e) {
   if (e.code) {
@@ -41,7 +40,7 @@ function getKeyName(e) {
 }
 
 window.addEventListener("keydown", (e) => {
-  // Ignore if user is typing in a text box
+  // Ignore typing in text boxes
   const tag = (e.target.tagName || "");
   if (["INPUT","TEXTAREA","SELECT"].includes(tag) || e.target.isContentEditable) return;
 
@@ -60,7 +59,6 @@ window.addEventListener("keydown", (e) => {
 
   const currentCombo = parts.join("+").toLowerCase();
 
-  // Check mappings
   for (let i = 0; i < storedMappings.length; i++) {
     const map = storedMappings[i];
     if (!map || !map.shortcut) continue;
@@ -68,7 +66,7 @@ window.addEventListener("keydown", (e) => {
     if (currentCombo === map.shortcut.toLowerCase()) {
       e.preventDefault();
       e.stopPropagation();
-      // Pass the index so we can announce "First shortcut", "Second shortcut", etc.
+      // Pass index for ordinal announcement
       triggerFromPayload({ ...map, index: i });
       return;
     }
@@ -77,7 +75,7 @@ window.addEventListener("keydown", (e) => {
 
 
 /* ==========================================================================
-   3. TRIGGER LOGIC
+   3. TRIGGER LOGIC (With Ordinal Announcement)
    ========================================================================== */
 function triggerFromPayload(payload) {
   if (payload.selector) {
@@ -86,20 +84,17 @@ function triggerFromPayload(payload) {
       if (el) {
         el.click();
         
-        // ANNOUNCE CONFIRMATION
+        // Announce "First shortcut triggered", "Second shortcut triggered", etc.
         const ordinals = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth"];
         let name = "Shortcut";
 
-        // If we have an index (0-9), convert to ordinal word
         if (typeof payload.index === 'number' && payload.index >= 0 && payload.index < ordinals.length) {
            name = `${ordinals[payload.index]} shortcut`;
         } else if (payload.colorName) {
-           // Fallback for Test buttons which might not send index
            name = payload.colorName; 
         }
 
         announceAction(`${name} triggered`);
-        
         return;
       }
     } catch (e) {}
@@ -107,10 +102,10 @@ function triggerFromPayload(payload) {
 }
 
 function announceAction(msg) {
-  let annDiv = document.getElementById('ct-action-announcer');
+  let annDiv = document.getElementById('ks-action-announcer');
   if (!annDiv) {
     annDiv = document.createElement('div');
-    annDiv.id = 'ct-action-announcer';
+    annDiv.id = 'ks-action-announcer';
     annDiv.setAttribute('aria-live', 'assertive');
     annDiv.setAttribute('role', 'status');
     Object.assign(annDiv.style, {
@@ -120,12 +115,10 @@ function announceAction(msg) {
     document.body.appendChild(annDiv);
   }
   
-  // Clear briefly to ensure repeated messages are read
   annDiv.textContent = "";
   setTimeout(() => { annDiv.textContent = msg; }, 50);
 }
 
-// Handle messages from Background (Ctrl+Shift+F) or Popup (Test Button)
 ext.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.action) return;
 
@@ -139,12 +132,10 @@ ext.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 
 /* ==========================================================================
-   4. PAGE LOAD FOCUS RESET (Fixes skipping header)
+   4. PAGE LOAD FOCUS RESET
    ========================================================================== */
 window.addEventListener("load", () => {
-  // If the browser attempts to restore focus to a button (because you clicked it
-  // before reloading), blur it. This forces the screen reader to start reading
-  // from the top of the document (Title -> H2 -> Instructions).
+  // Blur button focus on load to prevent screen reader skipping the header
   if (document.activeElement && document.activeElement.tagName === "BUTTON") {
     document.activeElement.blur();
   }
@@ -152,10 +143,10 @@ window.addEventListener("load", () => {
 
 
 /* ==========================================================================
-   5. SETTINGS OVERLAY UI
+   5. KEYSIGHT SETTINGS OVERLAY UI
    ========================================================================== */
-const OVERLAY_ID = 'shortcut-trigger-overlay';
-const IFRAME_ID = 'shortcut-trigger-iframe';
+const OVERLAY_ID = 'keysight-overlay';
+const IFRAME_ID = 'keysight-iframe';
 
 function createOverlay() {
   if (document.getElementById(OVERLAY_ID)) {
@@ -171,14 +162,14 @@ function createOverlay() {
       z-index: 2147483647; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
       border-radius: 8px; overflow: hidden; background: white; display: none;
     }
-    .ct-backdrop {
+    .ks-backdrop {
       position: fixed; inset: 0; background: rgba(0,0,0,0.5);
       z-index: 2147483646; display: none;
     }
-    .ct-frame { width: 100%; height: 100%; border: 0; }
-    .ct-close {
+    .ks-frame { width: 100%; height: 100%; border: 0; }
+    .ks-close {
       position: absolute; right: 10px; top: 10px;
-      background: #000000ff; color: #fff; /* Added white text for visibility */
+      background: #000000; color: #ffffff;
       border: 1px solid #ccc;
       padding: 5px 10px; border-radius: 4px; cursor: pointer;
       font-family: sans-serif; font-size: 13px; font-weight: bold;
@@ -188,23 +179,23 @@ function createOverlay() {
   document.head.appendChild(style);
 
   const backdrop = document.createElement('div');
-  backdrop.className = 'ct-backdrop';
+  backdrop.className = 'ks-backdrop';
   backdrop.onclick = hideOverlay;
 
   const container = document.createElement('div');
   container.id = OVERLAY_ID;
   container.setAttribute('role', 'dialog');
   container.setAttribute('aria-modal', 'true');
-  container.setAttribute('aria-label', 'Shortcut Trigger Settings');
+  container.setAttribute('aria-label', 'KeySight Settings');
 
   const closeBtn = document.createElement('button');
-  closeBtn.className = 'ct-close';
-  closeBtn.innerText = 'Close'; // Plain text "Close"
-  closeBtn.setAttribute('aria-label', 'Close settings');
+  closeBtn.className = 'ks-close';
+  closeBtn.innerText = 'Close';
+  closeBtn.setAttribute('aria-label', 'Close KeySight settings');
   closeBtn.onclick = hideOverlay;
 
   const iframe = document.createElement('iframe');
-  iframe.className = 'ct-frame';
+  iframe.className = 'ks-frame';
   iframe.id = IFRAME_ID;
   iframe.src = ext.runtime.getURL('popup.html');
 
@@ -224,12 +215,11 @@ function createOverlay() {
 
 function showOverlay() {
   const c = document.getElementById(OVERLAY_ID);
-  const b = document.querySelector('.ct-backdrop');
+  const b = document.querySelector('.ks-backdrop');
   if (c && b) {
     c.style.display = 'block';
     b.style.display = 'block';
     
-    // Focus logic for the popup
     setTimeout(() => {
         const iframe = document.getElementById(IFRAME_ID);
         if (iframe) {
@@ -244,7 +234,7 @@ function showOverlay() {
 
 function hideOverlay() {
   const c = document.getElementById(OVERLAY_ID);
-  const b = document.querySelector('.ct-backdrop');
+  const b = document.querySelector('.ks-backdrop');
   if (c) c.style.display = 'none';
   if (b) b.style.display = 'none';
   if (document.activeElement) document.activeElement.blur();

@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
-  "name": "Color Trigger (10 keys)",
+  "name": "KeySight",
   "version": "1.0",
-  "description": "Map 10 shortcuts to trigger color buttons on a page. Accessible settings popup.",
+  "description": "Navigate without sight. Map 10 custom keyboard shortcuts to click buttons and links instantly. Designed for screen reader users.",
   "permissions": [
     "commands",
     "tabs",
@@ -16,11 +16,11 @@
   },
   "browser_action": {
     "default_popup": "popup.html",
-    "default_title": "Shortcut Trigger Settings"
+    "default_title": "KeySight Settings"
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "color-trigger@example.com"
+      "id": "keysight@example.com"
     }
   },
   "content_scripts": [
@@ -41,7 +41,9 @@
     "trigger-8": { "description": "Trigger 8" },
     "trigger-9": { "description": "Trigger 9" },
     "trigger-10": { "description": "Trigger 10" },
-    "open-settings": {"suggested_key": {"default": "Ctrl+Shift+F"},"description": "Open shortcut settings popup"}
-
-}
+    "open-settings": {
+      "suggested_key": { "default": "Ctrl+Shift+F" },
+      "description": "Open KeySight settings"
+    }
+  }
 }

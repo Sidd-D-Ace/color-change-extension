@@ -1,25 +1,22 @@
-// background.js (MV2 event page) - Shortcut Trigger
+// background.js (MV2 event page) - KeySight
 // Handles keyboard commands and storage retrieval.
 
 const ext = (typeof browser !== "undefined") ? browser : chrome;
 
-console.log("[Shortcut Trigger BG] Background loaded.");
+console.log("[KeySight BG] Background loaded.");
 
 // ---- Helpers ----
-// Note: colorName is preserved for internal accessibility labels in the popup
+// UPDATED: Removed specific colors. Now uses generic "Trigger" names and empty selectors.
 function defaultMappings() {
-  return [
-    { colorName: "Red", selector: ".redBtn", shortcut: "Ctrl+Shift+1" },
-    { colorName: "Green", selector: ".greenBtn", shortcut: "Ctrl+Shift+2" },
-    { colorName: "Blue", selector: ".blueBtn", shortcut: "Ctrl+Shift+3" },
-    { colorName: "Yellow", selector: ".yellowBtn", shortcut: "Ctrl+Shift+4" },
-    { colorName: "Magenta", selector: ".magentaBtn", shortcut: "Ctrl+Shift+5" },
-    { colorName: "Cyan", selector: ".cyanBtn", shortcut: "Ctrl+Shift+6" },
-    { colorName: "Orange", selector: ".orangeBtn", shortcut: "Ctrl+Shift+7" },
-    { colorName: "Purple", selector: ".purpleBtn", shortcut: "Ctrl+Shift+8" },
-    { colorName: "Brown", selector: ".brownBtn", shortcut: "Ctrl+Shift+9" },
-    { colorName: "Black", selector: ".blackBtn", shortcut: "Ctrl+Shift+0" }
-  ];
+  const mappings = [];
+  for (let i = 1; i <= 10; i++) {
+    mappings.push({
+      colorName: `Trigger ${i}`, // Generic name
+      selector: "",              // Blank by default
+      shortcut: ""               // Blank by default
+    });
+  }
+  return mappings;
 }
 
 // Robust settings getter: returns a Promise that resolves to mappings array
@@ -65,25 +62,21 @@ function ensureContentScriptAndSend(tabId, payload) {
         return;
       }
       // If failed, content script might not be there. Inject it.
-      // console.warn('[BG] Content script missing, injecting...');
-
       try {
         ext.tabs.executeScript(tabId, { file: 'content_script.js' }, () => {
           if (ext.runtime && ext.runtime.lastError) {
-            console.warn('[BG] Injection failed:', ext.runtime.lastError.message);
+            console.warn('[KeySight BG] Injection failed:', ext.runtime.lastError.message);
             return;
           }
           // Retry sending after injection
           try {
-            ext.tabs.sendMessage(tabId, payload, (res2) => {
-              /* ignore secondary errors */
-            });
+            ext.tabs.sendMessage(tabId, payload, (res2) => {});
           } catch (e2) { /* ignore */ }
         });
       } catch (iex) { /* ignore */ }
     });
   } catch (e) {
-    console.warn('[BG] sendMessage threw:', e && e.message);
+    console.warn('[KeySight BG] sendMessage threw:', e && e.message);
   }
 }
 
@@ -114,7 +107,7 @@ function openSettingsOverlayOnPage() {
       }
     });
   } catch (err) {
-    console.warn('[BG] openSettingsOverlayOnPage error:', err && err.message);
+    console.warn('[KeySight BG] openSettingsOverlayOnPage error:', err && err.message);
   }
 }
 
@@ -123,7 +116,7 @@ function openSettingsOverlayOnPage() {
 ext.commands && ext.commands.onCommand.addListener((command) => {
   
   if (command === "open-settings") {
-    console.log("[BG] Opening settings overlay");
+    console.log("[KeySight BG] Opening settings overlay");
     openSettingsOverlayOnPage();
     return;
   }
@@ -131,13 +124,13 @@ ext.commands && ext.commands.onCommand.addListener((command) => {
   const idx = commandToIndex(command);
   if (idx === -1) return;
 
-  console.log("[BG] Command Trigger:", idx + 1);
+  console.log("[KeySight BG] Trigger:", idx + 1);
 
   getSettings().then((mappings) => {
     const map = mappings[idx] || {};
     const payload = {
       action: "trigger",
-      index: idx, // Content script uses this for "First/Second" announcement
+      index: idx, 
       colorName: map.colorName || "",
       selector: map.selector || null,
       from: "background"
@@ -145,10 +138,10 @@ ext.commands && ext.commands.onCommand.addListener((command) => {
 
     sendMessageToActiveTab(payload);
   }).catch((err) => {
-    console.error('[BG] Error reading settings:', err && err.message);
+    console.error('[KeySight BG] Error reading settings:', err && err.message);
   });
 });
 
 ext.runtime && ext.runtime.onInstalled && ext.runtime.onInstalled.addListener(() => {
-  console.log('[Shortcut Trigger BG] Extension installed/updated.');
+  console.log('[KeySight BG] Installed/Updated.');
 });

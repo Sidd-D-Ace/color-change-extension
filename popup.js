@@ -1,4 +1,4 @@
-/* popup.js - No Color Column + Duplicate Focus Stop */
+/* popup.js - KeySight: Generic Triggers + No Auto-Advance */
 const ext = (typeof browser !== 'undefined') ? browser : chrome;
 
 // DOM references
@@ -15,15 +15,18 @@ window.addEventListener('mouseup', () => { setTimeout(() => { __ct_isClicking = 
 
 
 /* --------------------------------------------------------------------------
-   DEFAULTS
+   DEFAULTS (Updated to Generic Triggers)
    -------------------------------------------------------------------------- */
 function defaultMappings() {
-  const names = ['Red','Green','Blue','Yellow','Magenta','Cyan','Orange','Purple','Brown','Black'];
-  return names.map((n, i) => ({
-    colorName: n,
-    selector: `.${n.toLowerCase()}Btn`,
-    shortcut: "" 
-  }));
+  const mappings = [];
+  for (let i = 1; i <= ROW_COUNT; i++) {
+    mappings.push({
+      colorName: `Trigger ${i}`, // Generic label (used for aria-labels)
+      selector: "",              // Blank by default
+      shortcut: ""               // Blank by default
+    });
+  }
+  return mappings;
 }
 
 
@@ -67,6 +70,7 @@ function buildRow(index, mapping) {
   selectorInput.type = 'text';
   selectorInput.className = 'selector';
   selectorInput.value = mapping.selector || '';
+  selectorInput.placeholder = index === 0 ? "e.g. .btn-save or #submit" : ""; // Helpful hint on row 1
   selectorInput.addEventListener('change', performAutoSave);
   tdSelector.appendChild(selectorInput);
   tr.appendChild(tdSelector);
@@ -78,7 +82,7 @@ function buildRow(index, mapping) {
   shortcutInput.className = 'shortcut';
   shortcutInput.readOnly = true;
   shortcutInput.value = mapping.shortcut || '';
-  // Use mapping.colorName from defaults for the label
+  // Use the generic name "Trigger 1" for the label
   shortcutInput.setAttribute('aria-label', `Shortcut for ${mapping.colorName || 'Row ' + (index+1)}`);
   tdShortcut.appendChild(shortcutInput);
   tr.appendChild(tdShortcut);
@@ -97,7 +101,7 @@ function buildRow(index, mapping) {
 function renderRows(mappings) {
   rowsContainer.innerHTML = '';
   for (let i = 0; i < ROW_COUNT; i++) {
-    const map = mappings[i] || { colorName: '', selector: '', shortcut: '' };
+    const map = mappings[i] || { colorName: `Trigger ${i+1}`, selector: '', shortcut: '' };
     rowsContainer.appendChild(buildRow(i, map));
   }
   attachRecorders();
@@ -172,7 +176,7 @@ function enableShortcutInput(input) {
 }
 
 /* --------------------------------------------------------------------------
-   Global Key Logic (UPDATED FOR DUPLICATE CHECK)
+   Global Key Logic
    -------------------------------------------------------------------------- */
 window.addEventListener('keydown', function (e) {
   const active = document.activeElement;
@@ -211,25 +215,8 @@ window.addEventListener('keyup', (e) => {
   const normalized = normalizeKeyName(main);
 
   if (normalized && !['Ctrl','Alt','Shift','Meta'].includes(normalized)) {
-    // 1. Stop recording (this triggers performAutoSave which highlights errors)
+    // Stop recording. Do NOT auto-advance.
     stopRecordingOn(active, true);
-    
-    // 2. CHECK FOR DUPLICATES BEFORE ADVANCING
-    const mappings = collectRows();
-    const dups = findDuplicateShortcuts(mappings);
-    const currentIndex = parseInt(active.closest('tr').dataset.index, 10);
-
-    // If this row is invalid/duplicate, STOP here. Do not auto-advance.
-    if (dups.includes(currentIndex)) {
-      return;
-    }
-
-    // 3. Only if valid, move to next row
-    const tr = active.closest('tr');
-    if (tr && tr.nextElementSibling) {
-       const next = tr.nextElementSibling.querySelector('.shortcut');
-       if (next) { next.dataset.skipFocus = '1'; next.focus(); }
-    }
   }
 }, true);
 
@@ -278,7 +265,7 @@ function normalizeKeyName(key) {
 function collectRows() {
   const defaults = defaultMappings();
   return Array.from(rowsContainer.querySelectorAll('tr')).map((tr, i) => ({
-    colorName: defaults[i].colorName, 
+    colorName: defaults[i].colorName, // "Trigger 1", "Trigger 2", etc.
     selector: tr.querySelector('.selector').value.trim(),
     shortcut: tr.querySelector('.shortcut').value.trim()
   }));
@@ -367,16 +354,16 @@ function sendMessageToActiveTab(msg) {
 
 // Init
 resetBtn.addEventListener('click', async () => {
-  if(confirm("Reset all settings to default?")) {
+  if(confirm("Clear all settings?")) {
      const defs = defaultMappings();
      renderRows(defs);
      await saveMappings(defs);
-     showStatus("Reset to defaults", "saved");
+     showStatus("All settings cleared", "saved");
   }
 });
 
 helpBtn.addEventListener('click', () => {
-  alert('Shortcuts only work when the webpage is focused.\nTo record, click a shortcut box and press your keys.');
+  alert('KeySight Help:\n\n1. Enter a CSS Selector (e.g. .btn-save or #submit).\n2. Click the box on the right and press your shortcut.\n3. Shortcuts work when the webpage is focused.\n\nPress "Test" to verify your selector.');
 });
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -385,4 +372,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const firstInput = document.querySelector('input');
     if (firstInput) firstInput.focus();
   });
+  // Ensure button text matches our new "Clear All" logic
+  if (resetBtn) resetBtn.textContent = "Clear All";
 });

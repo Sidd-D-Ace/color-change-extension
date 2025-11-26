@@ -1,109 +1,84 @@
-# Color Trigger Extension
+# KeySight
 
-A browser extension designed to help **visually impaired users** trigger color‑based actions on any webpage using **custom keyboard shortcuts**. The popup interface allows users to map 10 shortcuts to 10 selectable elements on a page.
+**Navigate without sight.**
 
-This project is fully accessible and compatible with **NVDA screen reader**.
+KeySight is a browser extension designed for screen reader users and power users who want to navigate the web faster. It allows you to map **10 custom keyboard shortcuts** to physically click buttons, follow links, or trigger elements on any webpage using CSS selectors.
 
----
+*(Add a screenshot of your settings popup here if you have one)*
 
-## ✨ Features
+## 🚀 Features
 
-* 10 customizable shortcut → button mappings
-* Designed for visually impaired users
-* NVDA‑friendly labels and focus order
-* Modifier-aware recorder (Ctrl, Shift, Alt, Meta)
-* Prevents duplicate shortcuts
-* Test button for each mapping
-* Works on Chrome, Edge, and Firefox
+* **10 Custom Triggers:** Map up to 10 distinct actions on a single page.
+* **Universal Compatibility:** Works on any website (Gmail, GitHub, YouTube, etc.).
+* **CSS Selector Support:** Target elements by ID, Class, or Attributes (e.g., `[aria-label="Submit"]`).
+* **Accessibility First:**
+    * Fully compatible with screen readers (NVDA, JAWS, VoiceOver).
+    * Audible confirmation when a shortcut is triggered (e.g., *"First shortcut triggered"*).
+    * Settings dialog is fully keyboard navigable.
+* **Auto-Save:** Settings are saved instantly as you type.
+* **No-Mouse Needed:** Open settings anywhere with `Ctrl+Shift+F`.
 
----
+## 🛠️ Installation
 
-## 📦 How to Install (Load Unpacked Extension)
+### Chrome / Edge / Brave (Developer Mode)
+Since this extension uses **Manifest V2**, it must be loaded in Developer Mode on Chromium browsers.
 
-Follow these steps to load the extension locally.
+1.  Download or clone this repository.
+2.  Open your browser's extensions page:
+    * **Chrome:** `chrome://extensions`
+    * **Edge:** `edge://extensions`
+3.  Enable **"Developer mode"** (usually a toggle in the top right).
+4.  Click **"Load unpacked"**.
+5.  Select the folder containing `manifest.json`.
 
-### **Chrome / Edge**
+### Firefox
+1.  Type `about:debugging` in the address bar.
+2.  Click **"This Firefox"** on the left sidebar.
+3.  Click **"Load Temporary Add-on"**.
+4.  Select the `manifest.json` file from the project folder.
 
-1. Download or clone this repository.
-2. Open your browser.
-3. Go to:
+## 📖 How to Use
 
-   * **Chrome:** `chrome://extensions/`
-   * **Edge:** `edge://extensions/`
-4. Enable **Developer mode** (top-right toggle).
-5. Click **Load unpacked**.
-6. Select the folder containing this extension (the folder with `manifest.json`).
-7. The extension will now appear in your toolbar.
+1.  **Open Settings:**
+    Press `Ctrl+Shift+F` (or Command+Shift+F on Mac) on any webpage to open the KeySight overlay.
 
-### **Firefox (Temporary Add-on)**
+2.  **Configure a Trigger:**
+    * **Selector:** Enter the CSS selector of the element you want to click.
+        * *Example (ID):* `#submit-btn`
+        * *Example (Class):* `.play-button`
+        * *Example (Attribute):* `a[aria-label="Next Page"]`
+    * **Shortcut:** Click the shortcut box and press the key combination you want to use (e.g., `Alt+1`).
 
-1. Download or clone this repository.
-2. Open Firefox.
-3. Go to: `about:debugging#/runtime/this-firefox`
-4. Click **Load Temporary Add-on**.
-5. Select the `manifest.json` file.
-6. The extension will be active until the browser closes.
+3.  **Test It:**
+    Click the **"Test"** button in the settings row to verify KeySight can find and click the element.
 
-> ⚠️ Firefox temporarily disables extensions when the browser restarts. For permanent installation, publish through AMO.
+4.  **Use It:**
+    Close the settings (`Esc`). Now, whenever you press your shortcut on that page, the button will be clicked instantly.
 
----
+## 📂 Project Structure
 
-## 🎯 Using the Extension
+* `manifest.json`: Extension configuration (MV2).
+* `content_script.js`: Handles keyboard listeners, DOM manipulation, and the settings overlay injection.
+* `background.js`: Manages global commands and settings storage retrieval.
+* `popup.html` / `popup.css` / `popup.js`: The settings interface logic and styling.
+* `test.html`: A local testing ground with buttons to verify shortcuts.
 
-1. Click the extension icon.
-2. You will see 10 rows:
+## ♿ Accessibility Notes
 
-   * **Color Name** (label for the action)
-   * **Selector** (CSS selector of the button on the page)
-   * **Shortcut** (record your keys)
-   * **Test** (check if the mapping works)
-3. To change a shortcut:
-
-   * Click inside the shortcut box
-   * Press your desired combination (e.g., `Ctrl + Shift + 2`)
-4. Save your settings.
-
-Shortcuts will trigger the corresponding element on the active webpage.
-
----
-
-## ♿ Accessibility
-
-* All inputs are labeled with **ARIA labels**.
-* NVDA announces every state clearly.
-* Error messages are read using a live region.
-* Focus automatically moves to the next row after recording.
-* No mouse required—fully keyboard navigable.
-
----
-
-## 🛠 Development
-
-```
-color-extension/
-├── manifest.json
-├── popup.html
-├── popup.css
-├── popup.js
-├── background.js
-├── content_script.js
-└── icons/
-```
-
-You can edit files and reload the extension from the browser extensions page.
-
----
+* **Announcements:** The extension uses `aria-live` regions to announce when the settings panel opens and when a shortcut is successfully triggered.
+* **Focus Management:** When the settings panel opens, focus is automatically managed to prevent "double reading" of the page title.
+* **Input Handling:** The shortcut recorder is designed to not trap focus; standard navigation keys like Tab work naturally unless you are actively recording.
 
 ## 🤝 Contributing
 
-Pull requests are welcome. Please ensure:
+Pull requests are welcome! If you find a bug or want to improve the accessibility further, please open an issue.
 
-* Code is readable
-* Accessibility is preserved
-* No breaking changes to keyboard recording
-
----
+1.  Fork the project.
+2.  Create your feature branch (`git checkout -b feature/AmazingFeature`).
+3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`).
+4.  Push to the branch (`git push origin feature/AmazingFeature`).
+5.  Open a Pull Request.
 
 ## 📄 License
 
-This project is released under the **MIT License**.
+Distributed under the MIT License. See `LICENSE` for more information.
