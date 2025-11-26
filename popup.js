@@ -1,4 +1,4 @@
-/* popup.js - KeySight: Generic Triggers + No Auto-Advance */
+/* popup.js - KeySight: No Test Button */
 const ext = (typeof browser !== 'undefined') ? browser : chrome;
 
 // DOM references
@@ -15,15 +15,15 @@ window.addEventListener('mouseup', () => { setTimeout(() => { __ct_isClicking = 
 
 
 /* --------------------------------------------------------------------------
-   DEFAULTS (Updated to Generic Triggers)
+   DEFAULTS
    -------------------------------------------------------------------------- */
 function defaultMappings() {
   const mappings = [];
   for (let i = 1; i <= ROW_COUNT; i++) {
     mappings.push({
-      colorName: `Trigger ${i}`, // Generic label (used for aria-labels)
-      selector: "",              // Blank by default
-      shortcut: ""               // Blank by default
+      colorName: `Trigger ${i}`, 
+      selector: "",              
+      shortcut: ""               
     });
   }
   return mappings;
@@ -70,7 +70,7 @@ function buildRow(index, mapping) {
   selectorInput.type = 'text';
   selectorInput.className = 'selector';
   selectorInput.value = mapping.selector || '';
-  selectorInput.placeholder = index === 0 ? "e.g. .btn-save or #submit" : ""; // Helpful hint on row 1
+  selectorInput.placeholder = index === 0 ? "e.g. .btn-save or #submit" : ""; 
   selectorInput.addEventListener('change', performAutoSave);
   tdSelector.appendChild(selectorInput);
   tr.appendChild(tdSelector);
@@ -82,18 +82,11 @@ function buildRow(index, mapping) {
   shortcutInput.className = 'shortcut';
   shortcutInput.readOnly = true;
   shortcutInput.value = mapping.shortcut || '';
-  // Use the generic name "Trigger 1" for the label
   shortcutInput.setAttribute('aria-label', `Shortcut for ${mapping.colorName || 'Row ' + (index+1)}`);
   tdShortcut.appendChild(shortcutInput);
   tr.appendChild(tdShortcut);
 
-  // Test Button
-  const tdTest = document.createElement('td');
-  const testBtn = document.createElement('button');
-  testBtn.type = 'button';
-  testBtn.textContent = 'Test';
-  tdTest.appendChild(testBtn);
-  tr.appendChild(tdTest);
+  // Test Button REMOVED
 
   return tr;
 }
@@ -105,7 +98,6 @@ function renderRows(mappings) {
     rowsContainer.appendChild(buildRow(i, map));
   }
   attachRecorders();
-  attachTestButtons();
 }
 
 
@@ -215,7 +207,6 @@ window.addEventListener('keyup', (e) => {
   const normalized = normalizeKeyName(main);
 
   if (normalized && !['Ctrl','Alt','Shift','Meta'].includes(normalized)) {
-    // Stop recording. Do NOT auto-advance.
     stopRecordingOn(active, true);
   }
 }, true);
@@ -265,7 +256,7 @@ function normalizeKeyName(key) {
 function collectRows() {
   const defaults = defaultMappings();
   return Array.from(rowsContainer.querySelectorAll('tr')).map((tr, i) => ({
-    colorName: defaults[i].colorName, // "Trigger 1", "Trigger 2", etc.
+    colorName: defaults[i].colorName, 
     selector: tr.querySelector('.selector').value.trim(),
     shortcut: tr.querySelector('.shortcut').value.trim()
   }));
@@ -312,24 +303,6 @@ function attachRecorders() {
   document.querySelectorAll('.shortcut').forEach(enableShortcutInput);
 }
 
-function attachTestButtons() {
-  document.querySelectorAll('button').forEach(btn => {
-    if (btn.id === 'resetBtn' || btn.id === 'helpShortcuts') return;
-    btn.addEventListener('click', () => {
-      const tr = btn.closest('tr');
-      if (!tr) return;
-      const index = parseInt(tr.dataset.index, 10);
-      const defaults = defaultMappings();
-      
-      sendMessageToActiveTab({ 
-        action: 'trigger', 
-        selector: tr.querySelector('.selector').value.trim(), 
-        colorName: defaults[index] ? defaults[index].colorName : "" 
-      });
-    });
-  });
-}
-
 function saveMappings(mappings) {
   return new Promise((resolve) => {
     try {
@@ -346,12 +319,6 @@ function loadMappings(cb) {
   });
 }
 
-function sendMessageToActiveTab(msg) {
-  ext.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs && tabs[0]) ext.tabs.sendMessage(tabs[0].id, msg);
-  });
-}
-
 // Init
 resetBtn.addEventListener('click', async () => {
   if(confirm("Clear all settings?")) {
@@ -363,7 +330,7 @@ resetBtn.addEventListener('click', async () => {
 });
 
 helpBtn.addEventListener('click', () => {
-  alert('KeySight Help:\n\n1. Enter a CSS Selector (e.g. .btn-save or #submit).\n2. Click the box on the right and press your shortcut.\n3. Shortcuts work when the webpage is focused.\n\nPress "Test" to verify your selector.');
+  alert('KeySight Help:\n\n1. Enter a CSS Selector (e.g. .btn-save or #submit).\n2. Click the box on the right and press your shortcut.\n3. Shortcuts work when the webpage is focused.');
 });
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -372,6 +339,5 @@ document.addEventListener('DOMContentLoaded', () => {
     const firstInput = document.querySelector('input');
     if (firstInput) firstInput.focus();
   });
-  // Ensure button text matches our new "Clear All" logic
   if (resetBtn) resetBtn.textContent = "Clear All";
 });

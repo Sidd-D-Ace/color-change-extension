@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "KeySight",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Navigate without sight. Map 10 custom keyboard shortcuts to click buttons and links instantly. Designed for screen reader users.",
   "permissions": [
     "commands",

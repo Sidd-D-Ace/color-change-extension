@@ -56,24 +56,21 @@ td {
   border-bottom: 1px solid #eee;
 }
 
-/* --- COLUMN WIDTHS (Updated indices) --- */
+/* --- COLUMN WIDTHS (3 Columns now) --- */
 
 /* 1. Index (#) */
 th:nth-child(1), td:nth-child(1) { 
-  width: 30px; 
+  width: 35px; 
   text-align: center; 
   font-weight: bold;
   color: #777;
 }
 
-/* 2. Selector (Expanded to 50% since Color Name is gone) */
-th:nth-child(2), td:nth-child(2) { width: 50%; } 
+/* 2. Selector (Given 60% space) */
+th:nth-child(2), td:nth-child(2) { width: 60%; } 
 
-/* 3. Shortcut */
-th:nth-child(3), td:nth-child(3) { width: 30%; }
-
-/* 4. Test Button */
-th:nth-child(4), td:nth-child(4) { width: 60px; text-align: center; }
+/* 3. Shortcut (Given rest) */
+th:nth-child(3), td:nth-child(3) { width: auto; }
 
 
 /* --- INPUTS --- */
