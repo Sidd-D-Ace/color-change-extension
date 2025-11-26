@@ -1,5 +1,5 @@
 {
-  "manifest_version": 3,
+  "manifest_version": 2,
   "name": "Color Trigger (10 keys)",
   "version": "1.0",
   "description": "Map 10 shortcuts to trigger color buttons on a page. Accessible settings popup.",
@@ -8,15 +8,20 @@
     "tabs",
     "storage",
     "activeTab",
-    "scripting"
+    "<all_urls>"
   ],
-  "host_permissions": ["<all_urls>"],
   "background": {
-    "service_worker": "background.js"
+    "scripts": ["background.js"],
+    "persistent": false
   },
-  "action": {
+  "browser_action": {
     "default_popup": "popup.html",
     "default_title": "Color Trigger — settings"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "color-trigger@example.com"
+    }
   },
   "content_scripts": [
     {
@@ -26,15 +31,17 @@
     }
   ],
   "commands": {
-    "trigger-1": { "suggested_key": { "default": "Ctrl+Shift+1" }, "description": "Trigger 1" },
-    "trigger-2": { "suggested_key": { "default": "Ctrl+Shift+2" }, "description": "Trigger 2" },
-    "trigger-3": { "suggested_key": { "default": "Ctrl+Shift+3" }, "description": "Trigger 3" },
-    "trigger-4": { "suggested_key": { "default": "Ctrl+Shift+4" }, "description": "Trigger 4" },
+    "trigger-1": { "description": "Trigger 1" },
+    "trigger-2": { "description": "Trigger 2" },
+    "trigger-3": { "description": "Trigger 3" },
+    "trigger-4": { "description": "Trigger 4" },
     "trigger-5": { "description": "Trigger 5" },
     "trigger-6": { "description": "Trigger 6" },
     "trigger-7": { "description": "Trigger 7" },
     "trigger-8": { "description": "Trigger 8" },
     "trigger-9": { "description": "Trigger 9" },
-    "trigger-10": { "description": "Trigger 10" }
+    "trigger-10": { "description": "Trigger 10" },
+    "open-settings": {"suggested_key": {"default": "Ctrl+Shift+F"},"description": "Open shortcut settings popup"}
+
 }
 }

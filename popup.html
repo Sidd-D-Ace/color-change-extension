@@ -8,18 +8,24 @@
 </head>
 <body>
   <main id="main" role="dialog" aria-labelledby="title" aria-modal="false">
+    
     <h1 id="title">Color Trigger — Settings</h1>
 
-    <p id="desc">Configure 10 triggers. For each row: <strong>Color name</strong>, <strong>button selector</strong> (CSS selector, e.g. <code>.redBtn</code> or <code>#myButton</code>) and <strong>shortcut</strong> (e.g. <code>Ctrl+Shift+1</code>).</p>
+    <!-- Hidden focus target for screen readers -->
+    <div id="start-message" tabindex="-1" class="sr-only" style="outline:none;">
+      Settings loaded. Press Control Shift F to open this box later.
+    </div>
 
-    <div id="announce" aria-live="polite" class="sr-only"></div>
+    <p id="desc">Configure 10 triggers. Changes are <strong>saved automatically</strong>.</p>
+
+    <div id="announce" role="status" aria-live="polite" class="sr-only"></div>
 
     <form id="mappingForm">
       <table id="mappingTable" aria-describedby="desc">
         <thead>
           <tr>
             <th scope="col">#</th>
-            <th scope="col">Color name</th>
+            <!-- Color Name Column REMOVED -->
             <th scope="col">Button selector / ID</th>
             <th scope="col">Shortcut</th>
             <th scope="col">Test</th>
@@ -29,13 +35,12 @@
       </table>
 
       <div class="controls">
-        <button id="saveBtn" type="button">Save</button>
         <button id="resetBtn" type="button">Reset to defaults</button>
         <button id="helpShortcuts" type="button">Help</button>
       </div>
 
       <div id="error" role="alert" aria-live="assertive"></div>
-      <p class="note">To change browser-level shortcuts globally, use your browser's extension shortcuts page (e.g., <code>chrome://extensions/shortcuts</code>).</p>
+      <div class="saved-notice" aria-live="polite"></div> 
     </form>
   </main>
 

@@ -1,28 +1,31 @@
-:root{
+:root {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  font-size: 15px;
+  font-size: 14px;
   color: #111;
   background: #fff;
 }
 
 body {
-  margin: 10px;
-  padding: 0;
-  width: 460px; /* increased popup width from 420 → 460 */
+  margin: 0;
+  padding: 16px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 h1 {
   font-size: 18px;
-  margin: 0 0 6px 0;
+  margin: 0 0 4px 0;
   font-weight: 700;
 }
 
 #desc {
   font-size: 13px;
-  margin: 6px 0 10px 0;
-  color: #333;
+  margin: 0 0 12px 0;
+  color: #555;
+  line-height: 1.4;
 }
 
+/* --- TABLE LAYOUT --- */
 table {
   width: 100%;
   border-collapse: collapse;
@@ -35,11 +38,13 @@ table {
 }
 
 thead th {
-  font-size: 13px;
+  font-size: 12px;
   background: #f5f6f7;
-  padding: 8px 6px;
+  padding: 10px 8px;
   text-align: left;
   border-bottom: 1px solid #e0e0e0;
+  font-weight: 600;
+  color: #444;
 }
 
 tbody tr:nth-child(odd) { background: #fafafa; }
@@ -49,115 +54,131 @@ td {
   padding: 6px;
   vertical-align: middle;
   border-bottom: 1px solid #eee;
-  font-size: 13px;
 }
 
-/* first column small */
-td:first-child {
-  width: 26px;
-  text-align:center;
-  font-weight:600;
+/* --- COLUMN WIDTHS (Updated indices) --- */
+
+/* 1. Index (#) */
+th:nth-child(1), td:nth-child(1) { 
+  width: 30px; 
+  text-align: center; 
+  font-weight: bold;
+  color: #777;
 }
 
-/* --------- NEW WIDTH FIX HERE --------- */
-td:nth-child(4) {
-  width: 200px;     /* enough for long shortcuts */
-}
+/* 2. Selector (Expanded to 50% since Color Name is gone) */
+th:nth-child(2), td:nth-child(2) { width: 50%; } 
 
-td .shortcut {
-  width: 190px !important;
-  min-width: 190px !important;
-  max-width: 190px !important;
+/* 3. Shortcut */
+th:nth-child(3), td:nth-child(3) { width: 30%; }
 
-  box-sizing: border-box;
-  text-align: center;
-  font-weight: 600;
-  letter-spacing: 0.6px;
+/* 4. Test Button */
+th:nth-child(4), td:nth-child(4) { width: 60px; text-align: center; }
 
-  white-space: nowrap;         /* No wrapping */
-  overflow: visible !important;
-  text-overflow: clip !important;
-}
 
-table {
-  table-layout: auto !important;
-}
-/* --------- END NEW FIX --------- */
-
-/* inputs */
+/* --- INPUTS --- */
 input[type="text"] {
   width: 100%;
   box-sizing: border-box;
   padding: 6px 8px;
   font-size: 13px;
-  border: 1px solid #bbb;
+  border: 1px solid #ccc;
   border-radius: 4px;
   background: #fff;
   outline: none;
+  transition: border 0.2s, box-shadow 0.2s;
 }
 
 input[type="text"]:focus {
   border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
 }
 
-/* test button */
-button {
-  padding: 6px 8px;
-  font-size: 13px;
-  border-radius: 6px;
-  border: 1px solid #666;
-  background: #f2f2f2;
+/* Shortcut specific styling */
+input.shortcut {
+  text-align: center;
+  font-family: monospace;
+  font-weight: 600;
   cursor: pointer;
+  background-color: #fcfcfc;
 }
 
-button:focus { outline: 2px solid #3b82f6; }
-
-/* controls */
-.controls {
-  display:flex;
-  gap:8px;
-  margin-top: 8px;
+input.shortcut.recording {
+  background-color: #ffeaea;
+  border-color: #d32f2f;
+  color: #d32f2f;
+  animation: pulse 1.5s infinite;
 }
 
-.controls button { flex: 1; }
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.4); }
+  70% { box-shadow: 0 0 0 4px rgba(211, 47, 47, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); }
+}
 
-/* error and announce region */
-#error {
-  color: #fff;
-  background: #c62828;
-  padding: 6px 8px;
+/* --- BUTTONS --- */
+button {
+  padding: 6px 10px;
+  font-size: 13px;
   border-radius: 4px;
+  border: 1px solid #ccc;
+  background: #f0f0f0;
+  cursor: pointer;
+  color: #333;
+}
+button:hover { background: #e0e0e0; }
+button:active { background: #d0d0d0; }
+button:focus { outline: 2px solid #3b82f6; outline-offset: 1px; }
+
+/* --- CONTROLS & NOTIFICATIONS --- */
+.controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.saved-notice {
+  background: #e6fffa;
+  color: #047857;
+  border: 1px solid #b7eb8f;
+  padding: 8px;
+  margin-top: 10px;
+  border-radius: 4px;
+  text-align: center;
   font-weight: 600;
   display: none;
-  margin-top: 8px;
 }
+.saved-notice.visible { display: block; }
 
+#error {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  padding: 8px;
+  margin-top: 10px;
+  border-radius: 4px;
+  text-align: center;
+  font-weight: 600;
+  display: none;
+}
 #error.visible { display: block; }
 
-#announce {
+.sr-only {
   position: absolute;
-  left: -9999px;
   width: 1px;
   height: 1px;
+  padding: 0;
+  margin: -1px;
   overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-/* highlighted duplicate rows */
 tr.duplicate td {
   background: #fff0f0 !important;
+}
+tr.duplicate td:first-child {
   border-left: 4px solid #d32f2f;
 }
-
-/* a calm \"saved\" message */
-.saved-notice {
-  color: #155724;
-  background: #d4edda;
-  border: 1px solid #c3e6cb;
-  padding: 6px 8px;
-  border-radius: 4px;
-  font-weight: 600;
-  display: none;
-  margin-top: 8px;
-}
-.saved-notice.visible { display:block; }
