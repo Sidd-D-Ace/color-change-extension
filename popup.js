@@ -109,7 +109,19 @@ function startRecordingOn(input) {
   delete input.dataset.skipFocus;
   input.dataset.recording = '1';
   input._previousValue = input.value;
+  
   input.value = 'Press keys...';
+  try{
+    const announcer = document.getElementById("announce");
+    if (announcer){
+      announcer.textContent="";
+
+      setTimeout(()=>{
+        announcer.textContent=input.value;
+      },50);
+    }
+  }catch(b){()=>{}}
+
   input.classList.add('recording');
   try { input.focus(); } catch (e) {}
 }
