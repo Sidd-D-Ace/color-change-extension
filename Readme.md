@@ -2,17 +2,22 @@
 
 **Navigate without sight.**
 
-KeySight is a browser extension designed for screen reader users and power users who want to navigate the web faster. It allows you to map **10 custom keyboard shortcuts** to physically click buttons, follow links, or trigger elements on any webpage using CSS selectors.
+KeySight is a browser extension designed for screen reader users and power users who want to navigate the web faster. It allows you to map **Unlimited custom keyboard shortcuts** to physically click buttons, follow links, or trigger elements on any webpage using CSS selectors.
 
 ## 🚀 Features
 
-* **10 Custom Triggers:** Map up to 10 distinct actions on a single page.
+* **Unlimited Custom Triggers:** Map Unlimited distinct actions on a single page.
 * **Universal Compatibility:** Works on any website (Gmail, GitHub, YouTube, etc.).
 * **CSS Selector Support:** Target elements by ID, Class, or Attributes (e.g., `[aria-label="Submit"]`).
 * **Accessibility First:**
     * Fully compatible with screen readers (NVDA, JAWS, VoiceOver).
     * Audible confirmation when a shortcut is triggered (e.g., *"First shortcut triggered"*).
     * Settings dialog is fully keyboard navigable.
+* **Quick Capture Mode:**
+    * Automatically fetches button id,class.
+    * Captures Shortcut and saves with the trigger.
+    * Activates with a Magic Key (Ctrl+Alt+C). 
+    * Automatically Renders new Row to the Setting Dialog.
 * **Auto-Save:** Settings are saved instantly as you type.
 * **No-Mouse Needed:** Open settings anywhere with `Ctrl+Shift+F`.
 
@@ -36,22 +41,36 @@ Since this extension uses **Manifest V2**, it must be loaded in Developer Mode o
 4.  Select the `manifest.json` file from the project folder.
 
 ## 📖 How to Use
+1. **Quick Capture Mode**
+    **i.    Focus on any Button on the Webpage**
+        Use TAB Key to Navigate to your desired button.
 
-1.  **Open Settings:**
-    Press `Ctrl+Shift+F` (or Command+Shift+F on Mac) on any webpage to open the KeySight overlay.
+    **ii.    Activate Quick Capture Mode**
+        Press the **Magic Key** `Ctrl+Alt+C` (or Command+Option+C on Mac) on any webpage. KeySight will automatically sets Button id/class for you, with a notification for confirmation.
+    
+    **iii.   Set Shortcut**
+        Press a Combination of Shortcut to set for the button. KeySight will Saves the shortcut for you.
+    
+    **iv.  Use It:**
+        Now, whenever you press your shortcut on that page, the button will be clicked instantly.
 
-2.  **Configure a Trigger:**
-    * **Selector:** Enter the CSS selector of the element you want to click.
-        * *Example (ID):* `#submit-btn`
-        * *Example (Class):* `.play-button`
-        * *Example (Attribute):* `a[aria-label="Next Page"]`
-    * **Shortcut:** Click the shortcut box and press the key combination you want to use (e.g., `Alt+1`).
+2. **Manually**
+    **i.  Open Settings:**
+        Press `Ctrl+Shift+F` (or Command+Shift+F on Mac) on any webpage to open the KeySight overlay.
 
-3.  **Test It:**
-    Click the **"Test"** button in the settings row to verify KeySight can find and click the element.
+    **ii.  Configure a Trigger:**
+        * **Selector:** Enter the CSS selector of the element you want to click.
+            * *Example (ID):* `#submit-btn`
+            * *Example (Class):* `.play-button`
+            * *Example (Attribute):* `a[aria-label="Next Page"]`
+        * **Shortcut:** Click the shortcut box and press the key combination you want to use (e.g., `Alt+1`).
 
-4.  **Use It:**
-    Close the settings (`Esc`). Now, whenever you press your shortcut on that page, the button will be clicked instantly.
+    **iii.  Delete Trigger:**
+        Click the **"Delete"** button in the settings row to delete the set trigger.
+
+    **iv.  Use It:**
+        Close the settings (`Esc`). Now, whenever you press your shortcut on that page, the button will be clicked instantly.
+
 
 ## 📂 Project Structure
 
