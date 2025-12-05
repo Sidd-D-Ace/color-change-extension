@@ -41,34 +41,35 @@ Since this extension uses **Manifest V2**, it must be loaded in Developer Mode o
 4.  Select the `manifest.json` file from the project folder.
 
 ## 📖 How to Use
-1. **Quick Capture Mode**
-    **1.    Focus on any Button on the Webpage**
+## 1. Quick Capture Mode
+
+**1.    Focus on any Button on the Webpage**
         Use TAB Key to Navigate to your desired button.
 
-    **2.    Activate Quick Capture Mode**
+**2.    Activate Quick Capture Mode**
         Press the **Magic Key** `Ctrl+Alt+C` (or Command+Option+C on Mac) on any webpage. KeySight will automatically sets Button id/class for you, with a notification for confirmation.
     
-    **3.   Set Shortcut**
+**3.   Set Shortcut**
         Press a Combination of Shortcut to set for the button. KeySight will Saves the shortcut for you.
     
-    **4.  Use It:**
+**4.  Use It:**
         Now, whenever you press your shortcut on that page, the button will be clicked instantly.
 
-2. **Manually**
-    **1.  Open Settings:**
+## 2. Manually
+**1.  Open Settings:**
         Press `Ctrl+Shift+F` (or Command+Shift+F on Mac) on any webpage to open the KeySight overlay.
 
-    **2.  Configure a Trigger:**
+**2.  Configure a Trigger:**
         * **Selector:** Enter the CSS selector of the element you want to click.
             * *Example (ID):* `#submit-btn`
             * *Example (Class):* `.play-button`
             * *Example (Attribute):* `a[aria-label="Next Page"]`
         * **Shortcut:** Click the shortcut box and press the key combination you want to use (e.g., `Alt+1`).
 
-    **3.  Delete Trigger:**
+**3.  Delete Trigger:**
         Click the **"Delete"** button in the settings row to delete the set trigger.
 
-    **4.  Use It:**
+**4.  Use It:**
         Close the settings (`Esc`). Now, whenever you press your shortcut on that page, the button will be clicked instantly.
 
 
