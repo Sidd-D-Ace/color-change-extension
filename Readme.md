@@ -4,8 +4,6 @@
 
 KeySight is a browser extension designed for screen reader users and power users who want to navigate the web faster. It allows you to map **10 custom keyboard shortcuts** to physically click buttons, follow links, or trigger elements on any webpage using CSS selectors.
 
-*(Add a screenshot of your settings popup here if you have one)*
-
 ## 🚀 Features
 
 * **10 Custom Triggers:** Map up to 10 distinct actions on a single page.

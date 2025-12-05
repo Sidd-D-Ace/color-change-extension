@@ -67,7 +67,7 @@ th:nth-child(1), td:nth-child(1) {
 }
 
 /* 2. Selector (Given 60% space) */
-th:nth-child(2), td:nth-child(2) { width: 60%; } 
+th:nth-child(2), td:nth-child(2) { width: 40%; } 
 
 /* 3. Shortcut (Given rest) */
 th:nth-child(3), td:nth-child(3) { width: auto; }

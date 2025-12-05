@@ -7,7 +7,8 @@
     "commands",
     "tabs",
     "storage",
-    "<all_urls>"
+    "<all_urls>",
+    "notifications"
   ],
   "background": {
     "scripts": [
@@ -42,41 +43,17 @@
     }
   ],
   "commands": {
-    "trigger-1": {
-      "description": "Trigger 1"
-    },
-    "trigger-2": {
-      "description": "Trigger 2"
-    },
-    "trigger-3": {
-      "description": "Trigger 3"
-    },
-    "trigger-4": {
-      "description": "Trigger 4"
-    },
-    "trigger-5": {
-      "description": "Trigger 5"
-    },
-    "trigger-6": {
-      "description": "Trigger 6"
-    },
-    "trigger-7": {
-      "description": "Trigger 7"
-    },
-    "trigger-8": {
-      "description": "Trigger 8"
-    },
-    "trigger-9": {
-      "description": "Trigger 9"
-    },
-    "trigger-10": {
-      "description": "Trigger 10"
-    },
     "open-settings": {
       "suggested_key": {
         "default": "Ctrl+Shift+F"
       },
       "description": "Open KeySight settings"
+    },
+    "quick-capture":  {
+      "suggested_key" :{
+        "default": "Ctrl+Alt+C"
+      },
+      "description": "Turns on Quick Capture Mode"
     }
   }
 }

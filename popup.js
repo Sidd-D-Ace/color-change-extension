@@ -6,6 +6,9 @@ const rowsContainer = document.getElementById('rows');
 const resetBtn = document.getElementById('resetBtn');
 const helpBtn = document.getElementById('helpShortcuts');
 const error = document.getElementById('error');
+let delBtn=document.querySelectorAll('deleteBtn');
+const addBtn=document.getElementById('addBtn');
+console.log(addBtn);
 
 const ROW_COUNT = 10;
 let __ct_isClicking = false;
@@ -19,13 +22,13 @@ window.addEventListener('mouseup', () => { setTimeout(() => { __ct_isClicking = 
    -------------------------------------------------------------------------- */
 function defaultMappings() {
   const mappings = [];
-  for (let i = 1; i <= ROW_COUNT; i++) {
-    mappings.push({
-      colorName: `Trigger ${i}`, 
-      selector: "",              
-      shortcut: ""               
-    });
-  }
+  // for (let i = 1; i <= ROW_COUNT; i++) {
+  //   mappings.push({
+  //     colorName: `Trigger ${i}`, 
+  //     selector: "",              
+  //     shortcut: ""               
+  //   });
+  // }
   return mappings;
 }
 
@@ -58,6 +61,7 @@ async function performAutoSave() {
 function buildRow(index, mapping) {
   const tr = document.createElement('tr');
   tr.dataset.index = index;
+  tr.dataset.value = `Trigger-${index+1}`;
 
   // Index
   const tdIndex = document.createElement('td');
@@ -86,6 +90,17 @@ function buildRow(index, mapping) {
   tdShortcut.appendChild(shortcutInput);
   tr.appendChild(tdShortcut);
 
+  // Delete Button
+  const tdDelete = document.createElement('td');
+  const deleteBtn = document.createElement('button');
+  deleteBtn.type='button';
+  deleteBtn.innerText='Delete'
+  deleteBtn.className='deleteBtn';
+  deleteBtn.value=index;
+  deleteBtn.setAttribute('aria-label',`Delete button for ${mapping.colorName || 'Row ' + (index+1)}`);
+  tdDelete.appendChild(deleteBtn);
+  tr.appendChild(tdDelete);
+
   // Test Button REMOVED
 
   return tr;
@@ -93,13 +108,35 @@ function buildRow(index, mapping) {
 
 function renderRows(mappings) {
   rowsContainer.innerHTML = '';
-  for (let i = 0; i < ROW_COUNT; i++) {
+  // for (let i = 0; i < ROW_COUNT; i++) {
+  //   const map = mappings[i] || { colorName: `Trigger ${i+1}`, selector: '', shortcut: '' };
+  //   rowsContainer.appendChild(buildRow(i, map));
+  // }
+
+  mappings.forEach((element,i) => {
     const map = mappings[i] || { colorName: `Trigger ${i+1}`, selector: '', shortcut: '' };
     rowsContainer.appendChild(buildRow(i, map));
-  }
+  });
   attachRecorders();
 }
 
+function addNewRow(){
+  const currentMappings=collectRows();
+  newRow={selector:'',shortcut:''};
+  currentMappings.push(newRow);
+  renderRows(currentMappings);
+  refreshMappings();
+  return currentMappings;
+}
+
+function deleteRow(index){
+  // const delRow=document.querySelector(`tr[dataset.index="${index}"]`)
+  const currentMappings=collectRows();
+  currentMappings.splice(index,1);
+  renderRows(currentMappings);
+  refreshMappings();
+  return currentMappings;
+}
 
 /* --------------------------------------------------------------------------
    Shortcut Recorder
@@ -223,6 +260,8 @@ window.addEventListener('keyup', (e) => {
   }
 }, true);
 
+
+
 /* --------------------------------------------------------------------------
    Helpers
    -------------------------------------------------------------------------- */
@@ -266,9 +305,10 @@ function normalizeKeyName(key) {
 }
 
 function collectRows() {
-  const defaults = defaultMappings();
+  // const defaults = defaultMappings();
   return Array.from(rowsContainer.querySelectorAll('tr')).map((tr, i) => ({
-    colorName: defaults[i].colorName, 
+    // colorName: defaults[i].colorName,
+    colorName: tr.value,
     selector: tr.querySelector('.selector').value.trim(),
     shortcut: tr.querySelector('.shortcut').value.trim()
   }));
@@ -331,7 +371,14 @@ function loadMappings(cb) {
   });
 }
 
+function refreshMappings(){
+  delBtn=document.querySelectorAll('.deleteBtn');
+  console.log(delBtn);
+}
+
 // Init
+
+
 resetBtn.addEventListener('click', async () => {
   if(confirm("Clear all settings?")) {
      const defs = defaultMappings();
@@ -344,6 +391,33 @@ resetBtn.addEventListener('click', async () => {
 helpBtn.addEventListener('click', () => {
   alert('KeySight Help:\n\n1. Enter a CSS Selector (e.g. .btn-save or #submit).\n2. Click the box on the right and press your shortcut.\n3. Shortcuts work when the webpage is focused.');
 });
+
+addBtn.addEventListener('click',async()=>{
+  const mapping=addNewRow();
+  const index=mapping.length-1
+  const currInput=document.querySelector(`tr[data-index="${index}"]`);
+  if(currInput){
+    const firstInput=currInput.querySelector('input');
+    if(firstInput){
+      firstInput.focus();
+      // await saveMappings(mapping);
+      // showStatus("Saved Successfully!","saved");
+    }
+  }else{
+    console.log("Cannot get tr of new row");
+  }
+})
+
+rowsContainer.addEventListener("click",async(event)=>{
+  if(event.target.matches('.deleteBtn')){
+    if(confirm(`Delete Trigger ${event.target.value + 1}?`)){
+    const btnIndex=event.target.value;
+    const mapping=deleteRow(btnIndex);
+    await saveMappings(mapping);
+    showStatus("Changes Saved Successfully","saved");
+    }
+  } 
+})
 
 document.addEventListener('DOMContentLoaded', () => {
   loadMappings((mappings) => {

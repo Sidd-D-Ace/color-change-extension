@@ -46,12 +46,12 @@ function getSettings() {
   }
 }
 
-function commandToIndex(command) {
-  const m = command && command.match ? command.match(/^trigger-(\d+)$/) : null;
-  if (!m) return -1;
-  const n = parseInt(m[1], 10);
-  return (n >= 1 && n <= 10) ? n - 1 : -1;
-}
+// function commandToIndex(command) {
+//   const m = command && command.match ? command.match(/^trigger-(\d+)$/) : null;
+//   if (!m) return -1;
+//   const n = parseInt(m[1], 10);
+//   return (n >= 1 && n <= 10) ? n - 1 : -1;
+// }
 
 // Try sending a message; if content script is missing, inject it then resend (MV2)
 function ensureContentScriptAndSend(tabId, payload) {
@@ -111,6 +111,29 @@ function openSettingsOverlayOnPage() {
   }
 }
 
+function quickCaptureOnPage(){
+  try{
+  ext.tabs.query({active:true, currentWindow:true}, (tabs)=>{
+    if(!tabs || !tabs[0]) return;
+    const tabId = tabs[0].id;
+
+    try{
+      console.log("Trying to send quick capture message");
+      const maybe = ext.tabs.sendMessage(tabId,{action: "quick_capture"});
+      if (maybe && typeof maybe.then === 'function') {
+        maybe.catch(()=>{});
+      }
+    } catch(e) {
+      try {
+        ext.tabs.sendMessage(tabId,{action: "quick-capture"}).catch(()=>{});
+      } catch(_) {}
+    }
+  });
+} catch(err){
+  console.warn('[KeySight BG] quickCaptureOnPage error:', err && err.message);
+}
+}
+
 
 // ---- Main command listener ----
 ext.commands && ext.commands.onCommand.addListener((command) => {
@@ -118,6 +141,12 @@ ext.commands && ext.commands.onCommand.addListener((command) => {
   if (command === "open-settings") {
     console.log("[KeySight BG] Opening settings overlay");
     openSettingsOverlayOnPage();
+    return;
+  }
+
+  if (command === "quick-capture") {
+    console.log("[KeySight BG] Quick Capture Mode ON");
+    quickCaptureOnPage();
     return;
   }
 

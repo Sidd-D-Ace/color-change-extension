@@ -1,5 +1,6 @@
 /* content_script.js - KeySight: Shortcuts + Settings Overlay */
 const ext = (typeof browser !== "undefined") ? browser : chrome;
+let isRecordingState=false; //quick capture mode
 
 // --- GUARD: Prevent double-injection ---
 if (window.hasKeySightRun) {
@@ -8,8 +9,10 @@ if (window.hasKeySightRun) {
 window.hasKeySightRun = true;
 
 console.log("[KeySight] Content script loaded.");
-
+setupNotificationPermissions(); 
 let storedMappings = [];
+let quickCaptureParts = [];
+
 
 /* ==========================================================================
    1. STORAGE HANDLING
@@ -39,15 +42,63 @@ function getKeyName(e) {
   return e.key ? e.key.toUpperCase() : "";
 }
 
+window.addEventListener('keyup', (e)=>{
+  if(isRecordingState && quickCaptureParts.length>0){
+  console.log(quickCaptureParts);
+  isRecordingState=false; 
+  const currentCombo = quickCaptureParts.join("+").toLowerCase();
+  storedMappings[(storedMappings.length)-1].shortcut = currentCombo;
+  saveMappings(storedMappings);
+  quickCaptureParts=[];
+  return;
+  }
+})
+
 window.addEventListener("keydown", (e) => {
   // Ignore typing in text boxes
   const tag = (e.target.tagName || "");
   if (["INPUT","TEXTAREA","SELECT"].includes(tag) || e.target.isContentEditable) return;
+  console.log(isRecordingState);
+  if(isRecordingState){
+    const mainKey = getKeyName(e);
+    if (!mainKey) return;
+    let parts=[];
+    if (e.ctrlKey) parts.push("Ctrl");
+    if (e.altKey) parts.push("Alt");
+    if (e.shiftKey) parts.push("Shift");
+    if (e.metaKey) parts.push("Meta");
+    
+    if (!["CTRL","ALT","SHIFT","META"].includes(mainKey.toUpperCase())) {
+      parts.push(mainKey);
+    }
+
+    const currentCombo = parts.join("+").toLowerCase();
+
+    for (let i = 0; i < storedMappings.length; i++) {
+    const map = storedMappings[i];
+    if (!map || map.shortcut === '') continue;
+
+    if (currentCombo === map.shortcut.toLowerCase()) {
+      e.preventDefault();
+      e.stopPropagation();
+      // Pass index for ordinal announcement
+      announceAction("Shortcut Already Exist! Try Again");
+      return;
+    }
+  }
+  console.log(parts);
+  joinParts(parts);
+
+  // storedMappings[(storedMappings.length)-1].shortcut = currentCombo;
+  //   saveMappings(storedMappings);
+  //   isRecordingState=false;
+  //   return;
+
+  }
 
   const mainKey = getKeyName(e);
   if (!mainKey) return;
-
-  const parts = [];
+  let parts=[];
   if (e.ctrlKey) parts.push("Ctrl");
   if (e.altKey) parts.push("Alt");
   if (e.shiftKey) parts.push("Shift");
@@ -71,6 +122,7 @@ window.addEventListener("keydown", (e) => {
       return;
     }
   }
+
 }, true);
 
 
@@ -85,16 +137,16 @@ function triggerFromPayload(payload) {
         el.click();
         
         // Announce "First shortcut triggered", "Second shortcut triggered", etc.
-        const ordinals = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth"];
-        let name = "Shortcut";
+        // const ordinals = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth"];
+        // let name = "Shortcut";
 
-        if (typeof payload.index === 'number' && payload.index >= 0 && payload.index < ordinals.length) {
-           name = `${ordinals[payload.index]} shortcut`;
-        } else if (payload.colorName) {
-           name = payload.colorName; 
-        }
+        // if (typeof payload.index === 'number' && payload.index >= 0 && payload.index < ordinals.length) {
+        //    name = `${ordinals[payload.index]} shortcut`;
+        // } else if (payload.colorName) {
+        //    name = payload.colorName; 
+        // }
 
-        announceAction(`${name} triggered`);
+        announceAction(`Shortcut triggered`);
         return;
       }
     } catch (e) {}
@@ -126,7 +178,13 @@ ext.runtime.onMessage.addListener((message, sender, sendResponse) => {
     triggerFromPayload(message);
   }
   if (message.action === "toggle_overlay") {
+    console.log("toggle overlay intercept");
     toggleOverlay();
+  }
+  if (message.action === "quick_capture") {
+    console.log("Quick Capture intercept");
+    announceAction("Quick Capture mode on.");
+    performQuickCapture();
   }
 });
 
@@ -241,7 +299,139 @@ function hideOverlay() {
 }
 
 function toggleOverlay() {
+  console.log("Entered toggleOverlay function");
   const c = document.getElementById(OVERLAY_ID);
   if (c && c.style.display === 'block') hideOverlay();
   else showOverlay();
+}
+
+// Quick Capture
+
+function performQuickCapture(){
+  const target=document.activeElement;
+  console.log(target);
+  if (target) {
+    if(!(target.id==="")){
+      const newId = quickCaptureNormalize(target.id,type='id');
+      if(quickCaptureCheck(newId)){
+        alert("Trigger Already Exists.");
+        return;
+      }
+      const newQuickCapture={selector : newId, shortcut : ''};
+      refreshMappings();
+      storedMappings.push(newQuickCapture)
+      console.log(storedMappings);
+      saveMappings(storedMappings);
+      announceAction("Triggered Selected, please press a shortcut combination.");
+      isRecordingState=true;
+      return;
+    }
+    if (!(target.className==="")) {
+      const newClass = '.'+quickCaptureNormalize(target.className,type='class');
+      console.log(newClass);
+      if(quickCaptureCheck(newClass)){
+        alert("Trigger Already Exists.");
+        return;
+      }
+      const newQuickCapture = {selector :  newClass,shortcut : ''};
+      refreshMappings();
+      storedMappings.push(newQuickCapture)
+      console.log(storedMappings);
+      saveMappings(storedMappings);
+      announceAction("Triggered Selected, please press a shortcut combination.");
+      
+      isRecordingState=true;
+      return;
+    }
+    if (!(target.ariaLabel==="" || target.ariaLabel===null)) {
+      // const newAriaLabel = quickCaptureNormalize(target.ariaLabel);
+      const newAriaLabel = target.ariaLabel;
+      if(quickCaptureCheck(newAriaLabel)){
+        alert("Trigger Already Exists.");
+        return;
+      }
+      const newQuickCapture = {selector : newAriaLabel};
+      refreshMappings();
+      storedMappings.push(newQuickCapture)
+      console.log(storedMappings);
+      announceAction("Triggered Selected, please press a shortcut combination.");
+      isRecordingState=true;
+      console.log(newQuickCapture);
+      return;
+    }
+  }
+}
+
+function quickCaptureNormalize(input,type){
+  console.log(input);
+  if(type==='id'){
+    if(/-+/.test(input) || /_+/.test(input)){
+      input=`[id="${input}"]`
+      return input;
+    }
+  }
+  if(type==='class'){
+    input=input.replace(/\s+/g,'.');
+    console.log(input);
+    return input;
+  }
+  
+}
+
+function quickCaptureCheck(input){
+  refreshMappings();
+  for(let i=0; i<=storedMappings.length; i++){
+    const map = storedMappings[i];
+    if(!map || map.selector==='') return;
+    if(input === map.selector){
+      return true;
+    }
+  }
+  return 0;
+}
+
+function quickCaptureRecord(){
+  return 0;
+}
+
+function joinParts(parts,e){
+  quickCaptureParts=[...parts];
+}
+
+function saveMappings(mappings) {
+  return new Promise((resolve) => {
+    try {
+      ext.storage.sync.set({ mappings }, () => {
+        const success = !ext.runtime.lastError;
+        if (success && Notification.permission === "granted") {
+            // Only attempt to show notification if permission is already given
+            const newNotification = new Notification("Saved Successfully."); 
+            setTimeout(()=>{newNotification.close()},2000);
+        }
+        resolve(success);
+      });
+    } catch(e) { resolve(false); }
+});
+
+}
+// Function called by an explicit "Enable Notifications" HTML button
+function setupNotificationPermissions() {
+    if (!("Notification" in window)) {
+        console.error("Notifications not supported");
+        return;
+    }
+    
+    if (Notification.permission !== "granted") {
+        Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+                console.log("Notification permission granted!");
+                // Optionally show a confirmation notification here
+                new Notification("Notifications Enabled!");
+            } else {
+                console.warn("Notification permission denied.");
+            }
+        });
+    } else {
+        console.log("Permission already granted.");
+    }
 }
