@@ -1,141 +1,79 @@
 // background.js (MV2 event page) - KeySight
-// Handles keyboard commands and storage retrieval.
-
+//# sourceURL=keysight_script.js;
 const ext = (typeof browser !== "undefined") ? browser : chrome;
 
 console.log("[KeySight BG] Background loaded.");
 
-// ---- Helpers ----
-// UPDATED: Removed specific colors. Now uses generic "Trigger" names and empty selectors.
+// 1. HELPERS
 function defaultMappings() {
   const mappings = [];
   for (let i = 1; i <= 10; i++) {
     mappings.push({
-      colorName: `Trigger ${i}`, // Generic name
-      selector: "",              // Blank by default
-      shortcut: ""               // Blank by default
+      colorName: `Trigger ${i}`,
+      selector: "",
+      shortcut: ""
     });
   }
   return mappings;
 }
 
-// Robust settings getter: returns a Promise that resolves to mappings array
 function getSettings() {
   try {
-    // Call storage.get — might return a Promise (Firefox) or undefined (Chrome)
     const maybe = ext.storage && ext.storage.sync && ext.storage.sync.get({ mappings: null });
-    
     if (maybe && typeof maybe.then === 'function') {
       return maybe.then(res => {
         return (res && res.mappings) ? res.mappings : defaultMappings();
       }).catch(() => defaultMappings());
     }
-
-    // Callback-style (Chrome)
     return new Promise((resolve) => {
-      try {
-        ext.storage.sync.get({ mappings: null }, (res) => {
-          resolve((res && res.mappings) ? res.mappings : defaultMappings());
-        });
-      } catch (e) {
-        resolve(defaultMappings());
-      }
+      ext.storage.sync.get({ mappings: null }, (res) => {
+        resolve((res && res.mappings) ? res.mappings : defaultMappings());
+      });
     });
   } catch (e) {
     return Promise.resolve(defaultMappings());
   }
 }
 
-// function commandToIndex(command) {
-//   const m = command && command.match ? command.match(/^trigger-(\d+)$/) : null;
-//   if (!m) return -1;
-//   const n = parseInt(m[1], 10);
-//   return (n >= 1 && n <= 10) ? n - 1 : -1;
-// }
-
-// Try sending a message; if content script is missing, inject it then resend (MV2)
-function ensureContentScriptAndSend(tabId, payload) {
-  try {
-    ext.tabs.sendMessage(tabId, payload, (res) => {
-      if (!(ext.runtime && ext.runtime.lastError)) {
-        // delivered successfully
-        return;
-      }
-      // If failed, content script might not be there. Inject it.
-      try {
-        ext.tabs.executeScript(tabId, { file: 'content_script.js' }, () => {
-          if (ext.runtime && ext.runtime.lastError) {
-            console.warn('[KeySight BG] Injection failed:', ext.runtime.lastError.message);
-            return;
-          }
-          // Retry sending after injection
-          try {
-            ext.tabs.sendMessage(tabId, payload, (res2) => {});
-          } catch (e2) { /* ignore */ }
-        });
-      } catch (iex) { /* ignore */ }
-    });
-  } catch (e) {
-    console.warn('[KeySight BG] sendMessage threw:', e && e.message);
-  }
+// ✅ FIXED: This function was commented out, causing a crash.
+function commandToIndex(command) {
+  const m = command && command.match ? command.match(/^trigger-(\d+)$/) : null;
+  if (!m) return -1;
+  const n = parseInt(m[1], 10);
+  return (n >= 1 && n <= 10) ? n - 1 : -1;
 }
 
+// ✅ FIXED: Removed "executeScript" injection (The source of the Eval error).
+// We now simply send the message. If the page hasn't reloaded, we catch the error silently.
 function sendMessageToActiveTab(payload) {
   ext.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (!tabs || !tabs[0]) return;
     const tabId = tabs[0].id;
-    ensureContentScriptAndSend(tabId, payload);
+    
+    // Attempt to send. If it fails (e.g., page not refreshed), we just log it.
+    // We do NOT try to inject the script manually anymore.
+    try {
+      ext.tabs.sendMessage(tabId, payload, (response) => {
+        if (ext.runtime.lastError) {
+          console.log("[KeySight] Script not ready. User may need to refresh page.");
+        }
+      });
+    } catch (e) {
+      console.log("[KeySight] Send failed:", e);
+    }
   });
 }
 
 function openSettingsOverlayOnPage() {
-  try {
-    ext.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs || !tabs[0]) return;
-      const tabId = tabs[0].id;
-      
-      // Send toggle message
-      try {
-        const maybe = ext.tabs.sendMessage(tabId, { action: "toggle_overlay" });
-        if (maybe && typeof maybe.then === "function") {
-          maybe.catch(() => {});
-        }
-      } catch (e) {
-        try {
-          ext.tabs.sendMessage(tabId, { action: "toggle_overlay" }).catch(()=>{});
-        } catch (_) {}
-      }
-    });
-  } catch (err) {
-    console.warn('[KeySight BG] openSettingsOverlayOnPage error:', err && err.message);
-  }
+  sendMessageToActiveTab({ action: "toggle_overlay" });
 }
 
 function quickCaptureOnPage(){
-  try{
-  ext.tabs.query({active:true, currentWindow:true}, (tabs)=>{
-    if(!tabs || !tabs[0]) return;
-    const tabId = tabs[0].id;
-
-    try{
-      console.log("Trying to send quick capture message");
-      const maybe = ext.tabs.sendMessage(tabId,{action: "quick_capture"});
-      if (maybe && typeof maybe.then === 'function') {
-        maybe.catch(()=>{});
-      }
-    } catch(e) {
-      try {
-        ext.tabs.sendMessage(tabId,{action: "quick-capture"}).catch(()=>{});
-      } catch(_) {}
-    }
-  });
-} catch(err){
-  console.warn('[KeySight BG] quickCaptureOnPage error:', err && err.message);
-}
+  sendMessageToActiveTab({ action: "quick_capture" });
 }
 
 
-// ---- Main command listener ----
+// 2. COMMAND LISTENER
 ext.commands && ext.commands.onCommand.addListener((command) => {
   
   if (command === "open-settings") {

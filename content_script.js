@@ -9,7 +9,7 @@ if (window.hasKeySightRun) {
 window.hasKeySightRun = true;
 
 console.log("[KeySight] Content script loaded.");
-setupNotificationPermissions(); 
+
 let storedMappings = [];
 let quickCaptureParts = [];
 
@@ -358,7 +358,7 @@ async function performQuickCapture(){
       return;
     }
     if (!(target.className==="")) {
-      const newClass = '.'+quickCaptureNormalize(target.className,type='class');
+      const newClass = quickCaptureNormalize(target.className,type='class');
       console.log(newClass);
       if(await quickCaptureCheck(newClass)){
         alert("Trigger Already Exists.");
@@ -401,10 +401,32 @@ function quickCaptureNormalize(input,type){
       return input;
     }
   }
-  if(type==='class'){
-    input=input.replace(/\s+/g,'.');
-    console.log(input);
-    return input;
+  if (type === 'class') {
+    // 1. Split the string into an array of class names
+    const classes = input.trim().split(/\s+/);
+
+    // 2. List of temporary classes to IGNORE
+    // Add any others you notice (like 'is-selected', 'active', etc.)
+    const ignoredClasses = [
+      'focus', 
+      'focused', 
+      'onfocused', 
+      'active', 
+      'selected', 
+      'hover', 
+      'is-focused', 
+      'focus-visible',
+      'keyboard-focused' 
+    ];
+
+    // 3. Filter out the bad classes
+    const cleanClasses = classes.filter(cls => !ignoredClasses.includes(cls));
+
+    // 4. Join them back together with dots
+    // If we filtered everything (rare), fall back to the original to avoid crashing
+    if (cleanClasses.length === 0) return '.' + input.trim().replace(/\s+/g, '.');
+
+    return '.' + cleanClasses.join('.');
   }
   
 }
