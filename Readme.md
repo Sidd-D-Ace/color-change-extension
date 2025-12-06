@@ -47,7 +47,7 @@ Since this extension uses **Manifest V2**, it must be loaded in Developer Mode o
         Use TAB Key to Navigate to your desired button.
 
 **2.    Activate Quick Capture Mode**
-        Press the **Magic Key** `Ctrl+Alt+C` (or Command+Option+C on Mac) on any webpage. KeySight will automatically sets Button id/class for you, with a notification for confirmation.
+        Press the **Magic Key** `Ctrl+Alt+C` (or Command+Option+C on Mac) on any webpage. KeySight will automatically sets Button id/class for you, with an announcement for confirmation.
     
 **3.   Set Shortcut**
         Press a Combination of Shortcut to set for the button. KeySight will Saves the shortcut for you.

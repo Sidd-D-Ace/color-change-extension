@@ -112,9 +112,9 @@ function renderRows(mappings) {
   //   const map = mappings[i] || { colorName: `Trigger ${i+1}`, selector: '', shortcut: '' };
   //   rowsContainer.appendChild(buildRow(i, map));
   // }
-
+  
   mappings.forEach((element,i) => {
-    const map = mappings[i] || { colorName: `Trigger ${i+1}`, selector: '', shortcut: '' };
+    const map = mappings[i] || { colorName: `Trigger ${i+1}`, selector: '', shortcut: '' , entryType: 'manual'};
     rowsContainer.appendChild(buildRow(i, map));
   });
   attachRecorders();
@@ -122,7 +122,7 @@ function renderRows(mappings) {
 
 function addNewRow(){
   const currentMappings=collectRows();
-  newRow={selector:'',shortcut:''};
+  newRow={selector:'',shortcut:'', entryType: 'manual'};
   currentMappings.push(newRow);
   renderRows(currentMappings);
   refreshMappings();
@@ -310,7 +310,7 @@ function collectRows() {
     // colorName: defaults[i].colorName,
     colorName: tr.value,
     selector: tr.querySelector('.selector').value.trim(),
-    shortcut: tr.querySelector('.shortcut').value.trim()
+    shortcut: tr.querySelector('.shortcut').value.trim(),
   }));
 }
 

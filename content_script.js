@@ -44,7 +44,6 @@ function getKeyName(e) {
 
 window.addEventListener('keyup', (e)=>{
   if(isRecordingState && quickCaptureParts.length>0){
-  console.log(quickCaptureParts);
   isRecordingState=false; 
   const currentCombo = quickCaptureParts.join("+").toLowerCase();
   storedMappings[(storedMappings.length)-1].shortcut = currentCombo;
@@ -52,6 +51,12 @@ window.addEventListener('keyup', (e)=>{
   quickCaptureParts=[];
   return;
   }
+  if(storedMappings.length>0){
+  if (!isRecordingState && storedMappings[(storedMappings.length)-1].shortcut==='' && storedMappings[(storedMappings.length)-1].entryType === 'quick-capture'){
+    console.log("Recording Again");
+    isRecordingState = true;
+  }
+}
 })
 
 window.addEventListener("keydown", (e) => {
@@ -83,10 +88,12 @@ window.addEventListener("keydown", (e) => {
       e.stopPropagation();
       // Pass index for ordinal announcement
       announceAction("Shortcut Already Exist! Try Again");
+      console.log("Shortcut Exists.");
+      isRecordingState=false;
+      quickCaptureParts=[];
       return;
     }
   }
-  console.log(parts);
   joinParts(parts);
 
   // storedMappings[(storedMappings.length)-1].shortcut = currentCombo;
@@ -153,6 +160,8 @@ function triggerFromPayload(payload) {
   }
 }
 
+let lastAnnouncedMessage = "";
+
 function announceAction(msg) {
   let annDiv = document.getElementById('ks-action-announcer');
   if (!annDiv) {
@@ -167,8 +176,26 @@ function announceAction(msg) {
     document.body.appendChild(annDiv);
   }
   
+  if (window.announcerSetupTimeout) clearTimeout(window.announcerSetupTimeout);
+  if (window.announcerCleanupTimeout) clearTimeout(window.announcerCleanupTimeout);
+
+  if (msg === lastAnnouncedMessage) {
+    msg = msg + "\u00A0"; 
+  }
+  
+  // Update the tracker
+  lastAnnouncedMessage = msg;
+
   annDiv.textContent = "";
-  setTimeout(() => { annDiv.textContent = msg; }, 50);
+  window.announcerSetupTimeout = setTimeout(() => { 
+    annDiv.textContent = msg; 
+    
+    // 5. Schedule the cleanup
+    window.announcerCleanupTimeout = setTimeout(() => { 
+      annDiv.textContent = ""; 
+    }, 1000); // Increased to 1s to ensure it's finished reading before clearing
+  }, 100);
+
 }
 
 ext.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -183,8 +210,7 @@ ext.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if (message.action === "quick_capture") {
     console.log("Quick Capture intercept");
-    announceAction("Quick Capture mode on.");
-    performQuickCapture();
+    performQuickCapture()
   }
 });
 
@@ -306,9 +332,14 @@ function toggleOverlay() {
 }
 
 // Quick Capture
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-function performQuickCapture(){
+async function performQuickCapture(){
   const target=document.activeElement;
+  announceAction("Quick Capture Mode On.");
+  
+  await delay(1500);
+  
   console.log(target);
   if (target) {
     if(!(target.id==="")){
@@ -317,11 +348,11 @@ function performQuickCapture(){
         alert("Trigger Already Exists.");
         return;
       }
-      const newQuickCapture={selector : newId, shortcut : ''};
+      const newQuickCapture={selector : newId, shortcut : '', entryType: 'quick-capture'};
       refreshMappings();
       storedMappings.push(newQuickCapture)
       console.log(storedMappings);
-      saveMappings(storedMappings);
+      await saveMappings(storedMappings);
       announceAction("Triggered Selected, please press a shortcut combination.");
       isRecordingState=true;
       return;
@@ -329,15 +360,15 @@ function performQuickCapture(){
     if (!(target.className==="")) {
       const newClass = '.'+quickCaptureNormalize(target.className,type='class');
       console.log(newClass);
-      if(quickCaptureCheck(newClass)){
+      if(await quickCaptureCheck(newClass)){
         alert("Trigger Already Exists.");
         return;
       }
-      const newQuickCapture = {selector :  newClass,shortcut : ''};
+      const newQuickCapture = {selector :  newClass,shortcut : '', entryType: 'quick-capture'};
       refreshMappings();
       storedMappings.push(newQuickCapture)
-      console.log(storedMappings);
-      saveMappings(storedMappings);
+
+      await saveMappings(storedMappings);
       announceAction("Triggered Selected, please press a shortcut combination.");
       
       isRecordingState=true;
@@ -350,7 +381,7 @@ function performQuickCapture(){
         alert("Trigger Already Exists.");
         return;
       }
-      const newQuickCapture = {selector : newAriaLabel};
+      const newQuickCapture = {selector : newAriaLabel, shortcut: '', entryType: 'quick-capture'};
       refreshMappings();
       storedMappings.push(newQuickCapture)
       console.log(storedMappings);
@@ -378,16 +409,28 @@ function quickCaptureNormalize(input,type){
   
 }
 
-function quickCaptureCheck(input){
+async function quickCaptureCheck(input){
   refreshMappings();
+  let newStoredMappings=[...storedMappings];
   for(let i=0; i<=storedMappings.length; i++){
     const map = storedMappings[i];
-    if(!map || map.selector==='') return;
+    if(!map || map.selector==='') continue;
     if(input === map.selector){
-      return true;
+      if(map.shortcut !== ''){
+        console.log('Returning true');
+        return true;
+      }
+
+      else if(map.shortcut === ''){
+      newStoredMappings = storedMappings.filter(item=>item.selector !== input);
+      break;
     }
+    }
+    
   }
-  return 0;
+  console.log(newStoredMappings);
+  await saveMappings(newStoredMappings);
+  return false;
 }
 
 function quickCaptureRecord(){
@@ -403,35 +446,15 @@ function saveMappings(mappings) {
     try {
       ext.storage.sync.set({ mappings }, () => {
         const success = !ext.runtime.lastError;
-        if (success && Notification.permission === "granted") {
-            // Only attempt to show notification if permission is already given
-            const newNotification = new Notification("Saved Successfully."); 
-            setTimeout(()=>{newNotification.close()},2000);
-        }
+        // if (success && Notification.permission === "granted") {
+        //     // Only attempt to show notification if permission is already given
+        //     const newNotification = new Notification("Saved Successfully."); 
+        //     setTimeout(()=>{newNotification.close()},2000);
+        // }
+        if(success) announceAction('Saved successfully');
         resolve(success);
       });
     } catch(e) { resolve(false); }
 });
 
-}
-// Function called by an explicit "Enable Notifications" HTML button
-function setupNotificationPermissions() {
-    if (!("Notification" in window)) {
-        console.error("Notifications not supported");
-        return;
-    }
-    
-    if (Notification.permission !== "granted") {
-        Notification.requestPermission().then(permission => {
-            if (permission === "granted") {
-                console.log("Notification permission granted!");
-                // Optionally show a confirmation notification here
-                new Notification("Notifications Enabled!");
-            } else {
-                console.warn("Notification permission denied.");
-            }
-        });
-    } else {
-        console.log("Permission already granted.");
-    }
 }
