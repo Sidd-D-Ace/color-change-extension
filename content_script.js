@@ -393,42 +393,54 @@ async function performQuickCapture(){
   }
 }
 
-function quickCaptureNormalize(input,type){
-  console.log(input);
-  if(type==='id'){
-    if(/-+/.test(input) || /_+/.test(input)){
-      input=`[id="${input}"]`
-      return input;
-    }
+function quickCaptureNormalize(input, type) {
+  if (type === 'id') {
+    return `[id="${input}"]`;
   }
+  
   if (type === 'class') {
-    // 1. Split the string into an array of class names
     const classes = input.trim().split(/\s+/);
 
-    // 2. List of temporary classes to IGNORE
-    // Add any others you notice (like 'is-selected', 'active', etc.)
-    const ignoredClasses = [
-      'focus', 
-      'focused', 
-      'onfocused', 
-      'active', 
-      'selected', 
-      'hover', 
-      'is-focused', 
-      'focus-visible',
-      'keyboard-focused' 
+    // 1. Exact matches (Generic)
+    const exactIgnored = [
+      'focus', 'focused', 'onfocused', 'active', 'selected', 'hover', 
+      'is-focused', 'focus-visible', 'keyboard-focused', 'visibly-focused',
+      'cdk-focused', 'cdk-program-focused', 'cdk-mouse-focused', 'cdk-keyboard-focused'
     ];
 
-    // 3. Filter out the bad classes
-    const cleanClasses = classes.filter(cls => !ignoredClasses.includes(cls));
+    // 2. Pattern Matching (The smart part)
+    // This catches "anything-focused", "anything-active", "ng-touched", etc.
+    const ignoredPatterns = [
+      /[-_]focused$/i,      // Matches cdk-focused, mat-focused, program-focused
+      /[-_]active$/i,       // Matches is-active, router-link-active
+      /^ng-touched$/i,      // Angular form states
+      /^ng-dirty$/i,
+      /^ng-pristine$/i,
+      /^ng-valid$/i,
+      /^ng-invalid$/i
+    ];
 
-    // 4. Join them back together with dots
-    // If we filtered everything (rare), fall back to the original to avoid crashing
-    if (cleanClasses.length === 0) return '.' + input.trim().replace(/\s+/g, '.');
+    const cleanClasses = classes.filter(cls => {
+      // Check Exact List
+      if (exactIgnored.includes(cls)) return false;
+      
+      // Check Regex Patterns
+      // If ANY pattern matches the class, we filter it out (return false)
+      if (ignoredPatterns.some(regex => regex.test(cls))) return false;
+
+      return true;
+    });
+
+    // Fallback: If we accidentally filtered EVERYTHING (unlikely), revert to original
+    if (cleanClasses.length === 0) {
+       // Only return the original if it's not empty, otherwise return a universal fallback
+       return '.' + input.trim().replace(/\s+/g, '.');
+    }
 
     return '.' + cleanClasses.join('.');
   }
   
+  return input;
 }
 
 async function quickCaptureCheck(input){
@@ -478,5 +490,4 @@ function saveMappings(mappings) {
       });
     } catch(e) { resolve(false); }
 });
-
 }
