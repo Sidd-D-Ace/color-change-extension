@@ -12,7 +12,7 @@ console.log("[KeySight] Content script loaded.");
 
 let storedMappings = [];
 let quickCaptureParts = [];
-
+let capturedElement = null;
 
 /* ==========================================================================
    1. STORAGE HANDLING
@@ -49,6 +49,10 @@ window.addEventListener('keyup', (e)=>{
   storedMappings[(storedMappings.length)-1].shortcut = currentCombo;
   saveMappings(storedMappings);
   quickCaptureParts=[];
+  if (capturedElement) {
+    capturedElement.style.border = "";
+    capturedElement = null; // Reset reference
+  }
   return;
   }
   if(storedMappings.length>0){
@@ -336,16 +340,21 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function performQuickCapture(){
   const target=document.activeElement;
+  target.style.border = "thick solid #fc0303"
   announceAction("Quick Capture Mode On.");
   
   await delay(1500);
   
   console.log(target);
   if (target) {
+    capturedElement = target;
     if(!(target.id==="")){
+      console.log(target.id);
       const newId = quickCaptureNormalize(target.id,type='id');
-      if(quickCaptureCheck(newId)){
+      console.log(newId);
+      if(await quickCaptureCheck(newId)){
         alert("Trigger Already Exists.");
+        target.style.border = "";
         return;
       }
       const newQuickCapture={selector : newId, shortcut : '', entryType: 'quick-capture'};
@@ -358,6 +367,7 @@ async function performQuickCapture(){
       return;
     }
     if (!(target.className==="")) {
+      console.log(target.className);
       const newClass = quickCaptureNormalize(target.className,type='class');
       console.log(newClass);
       if(await quickCaptureCheck(newClass)){
@@ -376,8 +386,9 @@ async function performQuickCapture(){
     }
     if (!(target.ariaLabel==="" || target.ariaLabel===null)) {
       // const newAriaLabel = quickCaptureNormalize(target.ariaLabel);
+      console.log(target.ariaLabel);
       const newAriaLabel = target.ariaLabel;
-      if(quickCaptureCheck(newAriaLabel)){
+      if(await quickCaptureCheck(newAriaLabel)){
         alert("Trigger Already Exists.");
         return;
       }
@@ -444,28 +455,44 @@ function quickCaptureNormalize(input, type) {
 }
 
 async function quickCaptureCheck(input){
-  refreshMappings();
-  let newStoredMappings=[...storedMappings];
-  for(let i=0; i<=storedMappings.length; i++){
+  // 1. Fetch fresh data reliably
+  const freshMappings = await new Promise((resolve) => {
+    ext.storage.sync.get({ mappings: null }, (res) => {
+      resolve(res.mappings || []);
+    });
+  });
+  
+  storedMappings = freshMappings; // Sync global state
+  let newStoredMappings = [...storedMappings];
+
+  // 2. Correct loop condition (i < length)
+  for(let i=0; i < storedMappings.length; i++){
     const map = storedMappings[i];
-    if(!map || map.selector==='') continue;
+    if(!map || map.selector === '') continue;
+
     if(input === map.selector){
+      // Case: Duplicate found with an existing shortcut -> Block it
       if(map.shortcut !== ''){
-        console.log('Returning true');
+        console.log('Returning true (Duplicate)');
         return true;
       }
-
-      else if(map.shortcut === ''){
-      newStoredMappings = storedMappings.filter(item=>item.selector !== input);
-      break;
+      // Case: Duplicate found but NO shortcut (stale capture) -> Remove old one
+      else {
+        newStoredMappings = newStoredMappings.filter(item => item.selector !== input);
+        break; // Stop looking, we found the stale one
+      }
     }
-    }
-    
   }
-  console.log(newStoredMappings);
-  await saveMappings(newStoredMappings);
+
+  // 3. Save cleanup if needed
+  if (newStoredMappings.length !== storedMappings.length) {
+    await saveMappings(newStoredMappings);
+    storedMappings = newStoredMappings;
+  }
+  
   return false;
 }
+
 
 function quickCaptureRecord(){
   return 0;
