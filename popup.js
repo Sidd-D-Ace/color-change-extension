@@ -1,17 +1,16 @@
-/* popup.js - KeySight: No Test Button */
-const ext = (typeof browser !== 'undefined') ? browser : chrome;
+/* popup.js - KeySight: Per-Site Settings (URL Param Fix) */
+const ext = (typeof chrome !== 'undefined') ? chrome : browser;
 
 // DOM references
-const rowsContainer = document.getElementById('rows');
-const resetBtn = document.getElementById('resetBtn');
-const helpBtn = document.getElementById('helpShortcuts');
-const error = document.getElementById('error');
-let delBtn=document.querySelectorAll('deleteBtn');
-const addBtn=document.getElementById('addBtn');
-console.log(addBtn);
+let rowsContainer;
+let resetBtn;
+let helpBtn;
+let error;
+let addBtn;
+let title;
 
-const ROW_COUNT = 10;
 let __ct_isClicking = false;
+let currentHostname = "Global"; 
 
 window.addEventListener('mousedown', () => { __ct_isClicking = true; }, true);
 window.addEventListener('mouseup', () => { setTimeout(() => { __ct_isClicking = false; }, 100); }, true);
@@ -21,17 +20,17 @@ window.addEventListener('mouseup', () => { setTimeout(() => { __ct_isClicking = 
    DEFAULTS
    -------------------------------------------------------------------------- */
 function defaultMappings() {
-  const mappings = [];
-  // for (let i = 1; i <= ROW_COUNT; i++) {
-  //   mappings.push({
-  //     colorName: `Trigger ${i}`, 
-  //     selector: "",              
-  //     shortcut: ""               
-  //   });
-  // }
-  return mappings;
+  return [{ 
+    colorName: "Trigger 1", 
+    selector: "", 
+    shortcut: "", 
+    entryType: "manual" 
+  }];
 }
 
+function getStorageKey() {
+  return "keysight_" + currentHostname;
+}
 
 /* --------------------------------------------------------------------------
    Auto-Save Logic
@@ -39,18 +38,18 @@ function defaultMappings() {
 async function performAutoSave() {
   const mappings = collectRows();
   
-  highlightRows([]);
+  if (typeof highlightRows === 'function') highlightRows([]);
   if (error) error.classList.remove('visible');
 
   const dups = findDuplicateShortcuts(mappings);
   if (dups.length > 0) {
-    highlightRows(dups);
+    if (typeof highlightRows === 'function') highlightRows(dups);
     showStatus("Duplicate shortcuts detected. Not saved.", "error");
     return;
   }
 
   const ok = await saveMappings(mappings);
-  if (ok) showStatus("Saved", "saved");
+  if (ok) showStatus("Saved for " + currentHostname, "saved");
   else showStatus("Error saving settings", "error");
 }
 
@@ -61,80 +60,79 @@ async function performAutoSave() {
 function buildRow(index, mapping) {
   const tr = document.createElement('tr');
   tr.dataset.index = index;
-  tr.dataset.value = `Trigger-${index+1}`;
+  const label = mapping.colorName || `Trigger ${index + 1}`;
 
-  // Index
   const tdIndex = document.createElement('td');
   tdIndex.textContent = index + 1;
   tr.appendChild(tdIndex);
 
-  // Selector
   const tdSelector = document.createElement('td');
   const selectorInput = document.createElement('input');
   selectorInput.type = 'text';
   selectorInput.className = 'selector';
   selectorInput.value = mapping.selector || '';
-  selectorInput.placeholder = index === 0 ? "e.g. .btn-save or #submit" : ""; 
+  selectorInput.placeholder = index === 0 ? "e.g. #search" : ""; 
   selectorInput.addEventListener('change', performAutoSave);
   tdSelector.appendChild(selectorInput);
   tr.appendChild(tdSelector);
 
-  // Shortcut
   const tdShortcut = document.createElement('td');
   const shortcutInput = document.createElement('input');
   shortcutInput.type = 'text';
   shortcutInput.className = 'shortcut';
   shortcutInput.readOnly = true;
   shortcutInput.value = mapping.shortcut || '';
-  shortcutInput.setAttribute('aria-label', `Shortcut for ${mapping.colorName || 'Row ' + (index+1)}`);
+  shortcutInput.setAttribute('aria-label', `Shortcut for ${label}`);
   tdShortcut.appendChild(shortcutInput);
   tr.appendChild(tdShortcut);
 
-  // Delete Button
   const tdDelete = document.createElement('td');
   const deleteBtn = document.createElement('button');
-  deleteBtn.type='button';
-  deleteBtn.innerText='Delete'
-  deleteBtn.className='deleteBtn';
-  deleteBtn.value=index;
-  deleteBtn.setAttribute('aria-label',`Delete button for ${mapping.colorName || 'Row ' + (index+1)}`);
+  deleteBtn.type = 'button';
+  deleteBtn.innerText = '×'; 
+  deleteBtn.className = 'deleteBtn';
+  deleteBtn.value = index; 
+  deleteBtn.setAttribute('aria-label', `Delete trigger ${index + 1}`);
+  
   tdDelete.appendChild(deleteBtn);
   tr.appendChild(tdDelete);
-
-  // Test Button REMOVED
 
   return tr;
 }
 
 function renderRows(mappings) {
+  if (!rowsContainer) {
+    console.error("Rows container not found!");
+    return;
+  }
   rowsContainer.innerHTML = '';
-  // for (let i = 0; i < ROW_COUNT; i++) {
-  //   const map = mappings[i] || { colorName: `Trigger ${i+1}`, selector: '', shortcut: '' };
-  //   rowsContainer.appendChild(buildRow(i, map));
-  // }
   
-  mappings.forEach((element,i) => {
-    const map = mappings[i] || { colorName: `Trigger ${i+1}`, selector: '', shortcut: '' , entryType: 'manual'};
-    rowsContainer.appendChild(buildRow(i, map));
+  (mappings || []).forEach((map, i) => {
+    const safeMap = map || { colorName: `Trigger ${i+1}`, selector: '', shortcut: '', entryType: 'manual'};
+    rowsContainer.appendChild(buildRow(i, safeMap));
   });
   attachRecorders();
 }
 
 function addNewRow(){
-  const currentMappings=collectRows();
-  newRow={selector:'',shortcut:'', entryType: 'manual'};
+  const currentMappings = collectRows();
+  const newRow = { 
+      colorName: `Trigger ${currentMappings.length + 1}`,
+      selector: '', 
+      shortcut: '', 
+      entryType: 'manual'
+  };
   currentMappings.push(newRow);
   renderRows(currentMappings);
-  refreshMappings();
+  saveMappings(currentMappings); 
   return currentMappings;
 }
 
 function deleteRow(index){
-  // const delRow=document.querySelector(`tr[dataset.index="${index}"]`)
-  const currentMappings=collectRows();
-  currentMappings.splice(index,1);
+  const currentMappings = collectRows();
+  currentMappings.splice(index, 1);
   renderRows(currentMappings);
-  refreshMappings();
+  saveMappings(currentMappings);
   return currentMappings;
 }
 
@@ -146,19 +144,7 @@ function startRecordingOn(input) {
   delete input.dataset.skipFocus;
   input.dataset.recording = '1';
   input._previousValue = input.value;
-  
   input.value = 'Press keys...';
-  try{
-    const announcer = document.getElementById("announce");
-    if (announcer){
-      announcer.textContent="";
-
-      setTimeout(()=>{
-        announcer.textContent=input.value;
-      },50);
-    }
-  }catch(b){()=>{}}
-
   input.classList.add('recording');
   try { input.focus(); } catch (e) {}
 }
@@ -171,9 +157,7 @@ function stopRecordingOn(input, save) {
   if (!save && input._previousValue !== undefined) {
     input.value = input._previousValue;
   }
-  
   delete input.dataset.activatedByEnter; 
-
   if (save) performAutoSave();
 }
 
@@ -187,96 +171,59 @@ function enableShortcutInput(input) {
     if (input.dataset.skipFocus === '1') { delete input.dataset.skipFocus; return; }
     if (__ct_isClicking) startRecordingOn(input);
   });
-
-  input.addEventListener('click', () => {
-    if (!input.dataset.recording) startRecordingOn(input);
-  });
-
-  input.addEventListener('blur', () => {
-    if (input.dataset.recording) stopRecordingOn(input, true);
-  });
-
+  input.addEventListener('click', () => { if (!input.dataset.recording) startRecordingOn(input); });
+  input.addEventListener('blur', () => { if (input.dataset.recording) stopRecordingOn(input, true); });
   input.addEventListener('keydown', (e) => {
     if (input.dataset.recording === '1') return;
     if (e.key === 'Tab') return;
     if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
-
     if (e.key === 'Enter') {
       e.preventDefault(); e.stopPropagation();
       input.dataset.activatedByEnter = '1';
       startRecordingOn(input);
       return;
     }
-
     e.preventDefault();
     startRecordingOn(input);
     updateInputDisplay(input, e);
   });
-  
   input.addEventListener('paste', (e) => e.preventDefault());
 }
 
-/* --------------------------------------------------------------------------
-   Global Key Logic
-   -------------------------------------------------------------------------- */
 window.addEventListener('keydown', function (e) {
   const active = document.activeElement;
   if (!active || !active.classList.contains('shortcut') || active.dataset.recording !== '1') return;
-  
-  if (active.dataset.activatedByEnter === '1' && e.key === 'Enter') {
-    e.preventDefault(); e.stopPropagation(); return;
-  }
-
+  if (active.dataset.activatedByEnter === '1' && e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); return; }
   e.preventDefault(); e.stopPropagation();
-
   if (e.key === 'Escape') { stopRecordingOn(active, false); return; }
   if (e.key === 'Backspace' || e.key === 'Delete') { active.value = ''; return; }
-
   updateInputDisplay(active, e);
 }, true);
 
 window.addEventListener('keyup', (e) => {
   const active = document.activeElement;
   if (!active || !active.classList.contains('shortcut')) return;
-
-  if (active.dataset.activatedByEnter === '1' && e.key === 'Enter') {
-     e.preventDefault(); e.stopPropagation();
-     delete active.dataset.activatedByEnter;
-     return;
-  }
-
+  if (active.dataset.activatedByEnter === '1' && e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); delete active.dataset.activatedByEnter; return; }
   if (active.dataset.recording !== '1') return;
   e.preventDefault(); e.stopPropagation();
   if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'Delete') return;
 
   const parts = active.value.split('+');
   let main = mainKeyFromEvent(e);
-  if (main === ' ') main = 'Space';
-  if (main === 'Esc') main = 'Escape';
   const normalized = normalizeKeyName(main);
-
   if (normalized && !['Ctrl','Alt','Shift','Meta'].includes(normalized)) {
     stopRecordingOn(active, true);
   }
 }, true);
 
-
-
-/* --------------------------------------------------------------------------
-   Helpers
-   -------------------------------------------------------------------------- */
 function updateInputDisplay(input, e) {
   const parts = [];
   if (e.ctrlKey) parts.push('Ctrl');
   if (e.altKey) parts.push('Alt');
   if (e.shiftKey) parts.push('Shift');
   if (e.metaKey) parts.push('Meta');
-
   let main = mainKeyFromEvent(e);
-  if (main === ' ') main = 'Space';
-  if (main === 'Esc') main = 'Escape';
   const normalizedMain = normalizeKeyName(main);
-
   if (normalizedMain && !['Ctrl','Alt','Shift','Meta'].includes(normalizedMain)) {
     if (!parts.includes(normalizedMain)) parts.push(normalizedMain);
   }
@@ -305,12 +252,12 @@ function normalizeKeyName(key) {
 }
 
 function collectRows() {
-  // const defaults = defaultMappings();
+  if (!rowsContainer) return [];
   return Array.from(rowsContainer.querySelectorAll('tr')).map((tr, i) => ({
-    // colorName: defaults[i].colorName,
-    colorName: tr.value,
+    colorName: `Trigger ${i + 1}`, 
     selector: tr.querySelector('.selector').value.trim(),
     shortcut: tr.querySelector('.shortcut').value.trim(),
+    entryType: 'manual'
   }));
 }
 
@@ -328,6 +275,7 @@ function findDuplicateShortcuts(mappings) {
 }
 
 function highlightRows(indices) {
+  if (!rowsContainer) return;
   document.querySelectorAll('#rows tr').forEach(tr => tr.classList.remove('duplicate'));
   indices.forEach(i => {
     const tr = document.querySelector(`#rows tr[data-index='${i}']`);
@@ -355,75 +303,144 @@ function attachRecorders() {
   document.querySelectorAll('.shortcut').forEach(enableShortcutInput);
 }
 
+/* --------------------------------------------------------------------------
+   STORAGE & INIT (Per-Site Logic)
+   -------------------------------------------------------------------------- */
 function saveMappings(mappings) {
   return new Promise((resolve) => {
     try {
-      ext.storage.sync.set({ mappings }, () => {
-        resolve(!ext.runtime.lastError);
-      });
+      const key = getStorageKey();
+      const payload = {};
+      payload[key] = mappings;
+      
+      if (ext.storage && ext.storage.sync) {
+        ext.storage.sync.set(payload, () => {
+          resolve(!ext.runtime.lastError);
+        });
+      } else {
+        console.error("Storage API unavailable");
+        resolve(false);
+      }
     } catch(e) { resolve(false); }
   });
 }
 
 function loadMappings(cb) {
-  ext.storage.sync.get({ mappings: null }, (res) => {
-    cb((res && res.mappings) ? res.mappings : defaultMappings());
-  });
+  // 1. Check URL Parameters (Overlay Mode)
+  const params = new URLSearchParams(window.location.search);
+  const paramHost = params.get('hostname');
+
+  if (paramHost) {
+    currentHostname = paramHost;
+    fetchStorage(cb);
+  } else {
+    // 2. Fallback to Tabs API (Toolbar Popup Mode)
+    // Safe check for tabs API existence
+    if (ext.tabs && ext.tabs.query) {
+      try {
+        ext.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+           if (ext.runtime.lastError) {
+             console.log("Tabs query error:", ext.runtime.lastError);
+             currentHostname = "Global";
+           } else if (tabs && tabs[0] && tabs[0].url) {
+             try {
+               currentHostname = new URL(tabs[0].url).hostname;
+             } catch(e) { currentHostname = "Global"; }
+           }
+           fetchStorage(cb);
+        });
+      } catch(e) {
+         currentHostname = "Global";
+         fetchStorage(cb);
+      }
+    } else {
+      currentHostname = "Global";
+      fetchStorage(cb);
+    }
+  }
 }
 
-function refreshMappings(){
-  delBtn=document.querySelectorAll('.deleteBtn');
-  console.log(delBtn);
+function fetchStorage(cb) {
+    if (title) title.textContent = `z.WebKeyBind: ${currentHostname}`;
+    console.log("[KeySight Popup] Loading for:", currentHostname);
+
+    const key = getStorageKey();
+    if (ext.storage && ext.storage.sync) {
+      ext.storage.sync.get(key, (res) => {
+        console.log("[KeySight Popup] Data loaded:", res);
+        const data = (res && res[key] && Array.isArray(res[key])) ? res[key] : [];
+        if (data.length === 0) {
+          cb(defaultMappings());
+        } else {
+          cb(data);
+        }
+      });
+    } else {
+       console.error("Storage API unavailable");
+       cb(defaultMappings());
+    }
 }
 
-// Init
-
-
-resetBtn.addEventListener('click', async () => {
-  if(confirm("Clear all settings?")) {
-     const defs = defaultMappings();
-     renderRows(defs);
-     await saveMappings(defs);
-     showStatus("All settings cleared", "saved");
-  }
-});
-
-helpBtn.addEventListener('click', () => {
-  alert('KeySight Help:\n\n1. Enter a CSS Selector (e.g. .btn-save or #submit).\n2. Click the box on the right and press your shortcut.\n3. Shortcuts work when the webpage is focused.');
-});
-
-addBtn.addEventListener('click',async()=>{
-  const mapping=addNewRow();
-  const index=mapping.length-1
-  const currInput=document.querySelector(`tr[data-index="${index}"]`);
-  if(currInput){
-    const firstInput=currInput.querySelector('input');
-    if(firstInput){
-      firstInput.focus();
-      // await saveMappings(mapping);
-      // showStatus("Saved Successfully!","saved");
-    }
-  }else{
-    console.log("Cannot get tr of new row");
-  }
-})
-
-rowsContainer.addEventListener("click",async(event)=>{
-  if(event.target.matches('.deleteBtn')){
-    if(confirm(`Delete Trigger ${event.target.value + 1}?`)){
-    const btnIndex=event.target.value;
-    const mapping=deleteRow(btnIndex);
-    await saveMappings(mapping);
-    showStatus("Changes Saved Successfully","saved");
-    }
-  } 
-})
-
+// ⚠️ INITIALIZATION
 document.addEventListener('DOMContentLoaded', () => {
+  console.log("[KeySight Popup] DOM Loaded");
+  
+  rowsContainer = document.getElementById('rows');
+  resetBtn = document.getElementById('resetBtn');
+  helpBtn = document.getElementById('helpShortcuts');
+  error = document.getElementById('error');
+  addBtn = document.getElementById('addBtn');
+  title = document.getElementById('title');
+
   loadMappings((mappings) => {
     renderRows(mappings);
     const firstInput = document.querySelector('input');
     if (firstInput) firstInput.focus();
   });
-  if (resetBtn) resetBtn.textContent = "Clear All";
+
+  if (resetBtn) {
+    resetBtn.textContent = "Clear All";
+    resetBtn.addEventListener('click', async () => {
+      if(confirm("Delete all settings for " + currentHostname + "?")) {
+         const defs = defaultMappings();
+         renderRows(defs);
+         await saveMappings(defs); 
+         showStatus("All settings cleared", "saved");
+      }
+    });
+  }
+
+  if (helpBtn) {
+    helpBtn.addEventListener('click', () => {
+      alert(`z.WebKeyBind Help for ${currentHostname}:\n\n1. Press "Add New" to add a row.\n2. Enter a Selector.\n3. Click the box on the right and press your shortcut.\n4. Use the "X" button to delete rows.`);
+    });
+  }
+
+  if (rowsContainer) {
+    rowsContainer.addEventListener("click", async (event) => {
+      const btn = event.target.closest('.deleteBtn');
+      if(btn){
+        const visualIndex = parseInt(btn.value) + 1;
+        if(confirm(`Delete Trigger ${visualIndex}?`)){
+          const btnIndex = parseInt(btn.value);
+          deleteRow(btnIndex);
+          showStatus("Trigger deleted", "saved");
+        }
+      } 
+    });
+  }
+
+  if (addBtn) {
+    addBtn.addEventListener('click', async () => {
+      const mapping = addNewRow();
+      const index = mapping.length - 1;
+      setTimeout(() => {
+          const currRow = document.querySelector(`tr[data-index="${index}"]`);
+          if(currRow){
+            const firstInput = currRow.querySelector('input.selector');
+            if(firstInput) firstInput.focus();
+          }
+      }, 50);
+    });
+  }
 });

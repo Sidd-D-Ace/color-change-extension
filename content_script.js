@@ -1,12 +1,11 @@
 /* content_script.js - KeySight: Shortcuts + Settings Overlay (MV3 Compatible) */
 
 const ext = (typeof browser !== "undefined") ? browser : chrome;
-
-// --- STATE VARIABLES ---
-let isRecordingState = false;
+let isRecordingState = false; 
+let capturedElement = null; 
+let currentHighlightedElement = null;
 let isMouseMode = false;
-let capturedElement = null; // Element waiting for shortcut assignment
-let currentHighlightedElement = null; // Element currently hovered in mouse mode
+let mouseHighlightTarget = null;
 let storedMappings = [];
 let quickCaptureParts = [];
 
@@ -21,15 +20,23 @@ if (window.hasKeySightRun) {
 /* ==========================================================================
    1. STORAGE HANDLING
    ========================================================================== */
+function getStorageKey() {
+  return "keysight_" + window.location.hostname;
+}
+
 function refreshMappings() {
-  ext.storage.sync.get({ mappings: null }, (res) => {
-    storedMappings = res.mappings || [];
+  const key = getStorageKey();
+  ext.storage.sync.get(key, (res) => {
+    storedMappings = res[key] || [];
   });
 }
 refreshMappings();
 
 ext.storage.onChanged.addListener((changes) => {
-  if (changes.mappings) storedMappings = changes.mappings.newValue || [];
+  const key = getStorageKey();
+  if (changes[key]) {
+    storedMappings = changes[key].newValue || [];
+  }
 });
 
 /* ==========================================================================
@@ -46,12 +53,10 @@ function getKeyName(e) {
 }
 
 window.addEventListener('keyup', (e) => {
-  // Handle finalizing the shortcut recording
   if (isRecordingState && quickCaptureParts.length > 0) {
     isRecordingState = false;
     const currentCombo = quickCaptureParts.join("+").toLowerCase();
 
-    // Save to the last entry
     if (storedMappings.length > 0) {
       const lastIndex = storedMappings.length - 1;
       if (storedMappings[lastIndex].entryType === 'quick-capture') {
@@ -62,14 +67,12 @@ window.addEventListener('keyup', (e) => {
 
     quickCaptureParts = [];
 
-    // Clean up visual cues
     if (capturedElement) {
       capturedElement.style.border = "";
       capturedElement.style.outline = "";
       capturedElement = null;
     }
     
-    // Clean up mouse mode cursor if it was left on
     if (isMouseMode) {
         disableMouseMode();
     }
@@ -77,11 +80,18 @@ window.addEventListener('keyup', (e) => {
     showStatusDialog(`Saved: ${currentCombo}`, 2000);
     return;
   }
+  
+  if (storedMappings.length > 0) {
+    const lastItem = storedMappings[storedMappings.length - 1];
+    if (!isRecordingState && lastItem && lastItem.shortcut === '' && lastItem.entryType === 'quick-capture') {
+      isRecordingState = true;
+      showStatusDialog("Press keys to record shortcut...", 0); 
+    }
+  }
 });
 
 window.addEventListener("keydown", (e) => {
   const tag = (e.target.tagName || "");
-  // Ignore typing in text inputs unless we are specifically recording a shortcut
   if (!isRecordingState && (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || e.target.isContentEditable)) return;
 
   const mainKey = getKeyName(e);
@@ -98,16 +108,13 @@ window.addEventListener("keydown", (e) => {
   }
   const combo = parts.join("+");
 
-  // --- RECORDING STATE ---
   if (isRecordingState) {
     e.preventDefault();
     e.stopPropagation();
 
-    // Check for duplicates
     for (let i = 0; i < storedMappings.length; i++) {
       const map = storedMappings[i];
       if (!map || map.shortcut === '') continue;
-      // Skip the item currently being edited (last one)
       if (i === storedMappings.length - 1 && map.entryType === 'quick-capture') continue;
 
       if (combo.toLowerCase() === map.shortcut.toLowerCase()) {
@@ -120,31 +127,25 @@ window.addEventListener("keydown", (e) => {
     return;
   }
 
-  // --- SHORTCUT COMMANDS ---
-  
-  // Alt + C : Keyboard Quick Capture
   if (e.altKey && mainKey === "C" && !isMouseMode) {
     e.preventDefault();
     performQuickCapture();
     return;
   }
 
-  // Alt + M : Mouse Capture Mode
   if (e.altKey && mainKey === "M") {
     e.preventDefault();
     performMouseCapture();
     return;
   }
 
-  // Escape : Cancel Mouse Mode
   if (isMouseMode && e.key === "Escape") {
     disableMouseMode();
     showStatusDialog("Mouse Capture Cancelled", 2000);
     return;
   }
 
-  // --- TRIGGER MODE ---
-  if (isMouseMode) return; // Don't trigger while selecting
+  if (isMouseMode) return; 
 
   const currentComboLower = combo.toLowerCase();
   for (let i = 0; i < storedMappings.length; i++) {
@@ -161,22 +162,19 @@ window.addEventListener("keydown", (e) => {
 }, true);
 
 /* ==========================================================================
-   3. MOUSE LISTENERS (For Mouse Capture Mode)
+   3. MOUSE LISTENERS
    ========================================================================== */
 document.addEventListener("mouseover", (e) => {
   if (!isMouseMode) return;
   e.stopPropagation();
 
-  // Don't re-apply if it's the same element
   if (currentHighlightedElement === e.target) return;
   if (e.target === document.body || e.target === document.documentElement) return;
 
-  // Clear previous
   if (currentHighlightedElement) {
     currentHighlightedElement.style.outline = "";
   }
 
-  // Highlight new
   e.target.style.outline = "4px solid #fc0303";
   currentHighlightedElement = e.target;
 });
@@ -196,18 +194,16 @@ document.addEventListener("click", (e) => {
 
   const target = e.target;
   
-  // Clean up visual highlight immediately
   if(currentHighlightedElement) {
       currentHighlightedElement.style.outline = "";
       currentHighlightedElement = null;
   }
 
-  // Handle the capture
   mouseCaptureHandler(target);
 }, true);
 
 /* ==========================================================================
-   4. CAPTURE LOGIC (Shared)
+   4. CAPTURE LOGIC
    ========================================================================== */
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -231,17 +227,12 @@ function disableMouseMode() {
   hideStatusDialog();
 }
 
-// Handler for when Mouse Mode is used
 async function mouseCaptureHandler(target) {
-  // Turn off mouse mode logic
   isMouseMode = false;
   document.body.style.cursor = 'auto';
-  
-  // Hand over to the selector logic
   await selectorHandler(target);
 }
 
-// Handler for Keyboard (Alt+C)
 async function performQuickCapture() {
   const target = document.activeElement;
   if (!target || target === document.body) {
@@ -249,25 +240,20 @@ async function performQuickCapture() {
     return;
   }
 
-  // Visual feedback for keyboard users
   target.style.border = "thick solid #fc0303";
+  capturedElement = target; 
   showStatusDialog("Quick Capture ON: Analyzing...", 0);
   
   await delay(1000);
   await selectorHandler(target);
 }
 
-// Core Selector Processing
 async function selectorHandler(target) {
   if (!target) return;
 
-  // Track this element to clear styles later
   capturedElement = target;
-  
-  // Ensure it looks selected (useful for both mouse/keyboard paths)
   target.style.border = "thick solid #fc0303"; 
 
-  // 1. ID Check
   if (target.id) {
     const newId = quickCaptureNormalize(target.id, 'id');
     if (await quickCaptureCheck(newId)) {
@@ -279,7 +265,6 @@ async function selectorHandler(target) {
     return;
   }
 
-  // 2. Class Check
   if (target.className && typeof target.className === 'string' && target.className.trim() !== "") {
     const newClass = quickCaptureNormalize(target.className, 'class');
     if (await quickCaptureCheck(newClass)) {
@@ -291,7 +276,6 @@ async function selectorHandler(target) {
     return;
   }
 
-  // 3. Aria Label Check
   if (target.getAttribute('aria-label')) {
     const newSelector = `[aria-label="${target.getAttribute('aria-label')}"]`;
     if (await quickCaptureCheck(newSelector)) {
@@ -303,7 +287,6 @@ async function selectorHandler(target) {
     return;
   }
 
-  // Fallback
   showStatusDialog("Could not capture element (No ID/Class).", 3000);
   target.style.border = "";
   target.style.outline = "";
@@ -312,9 +295,15 @@ async function selectorHandler(target) {
 async function saveNewTrigger(selector) {
   const newQuickCapture = { selector: selector, shortcut: '', entryType: 'quick-capture' };
 
-  refreshMappings(); // Ensure local cache is somewhat fresh
+  await new Promise(r => {
+      const key = getStorageKey();
+      ext.storage.sync.get(key, (res) => {
+          storedMappings = res[key] || [];
+          r();
+      });
+  });
+
   storedMappings.push(newQuickCapture);
-  
   await saveMappings(storedMappings);
   
   showStatusDialog("Element Captured. Press shortcut keys now...", 0);
@@ -322,7 +311,7 @@ async function saveNewTrigger(selector) {
 }
 
 /* ==========================================================================
-   5. HELPERS & UTILS
+   5. HELPERS
    ========================================================================== */
 function quickCaptureNormalize(input, type) {
   if (type === 'id') return `[id="${input}"]`;
@@ -345,10 +334,10 @@ function quickCaptureNormalize(input, type) {
 }
 
 async function quickCaptureCheck(input) {
-  // Fetch fresh from storage to be safe
   const freshMappings = await new Promise((resolve) => {
-    ext.storage.sync.get({ mappings: null }, (res) => {
-      resolve(res.mappings || []);
+    const key = getStorageKey();
+    ext.storage.sync.get(key, (res) => {
+      resolve(res[key] || []);
     });
   });
 
@@ -364,7 +353,6 @@ async function quickCaptureCheck(input) {
       if (map.shortcut !== '') {
         foundDuplicate = true;
       } else {
-        // If selector exists but NO shortcut (stale capture), remove it
         newStoredMappings = newStoredMappings.filter(item => item.selector !== input);
       }
     }
@@ -385,7 +373,11 @@ function joinParts(parts) {
 function saveMappings(mappings) {
   return new Promise((resolve) => {
     try {
-      ext.storage.sync.set({ mappings }, () => {
+      const key = getStorageKey();
+      const payload = {};
+      payload[key] = mappings;
+      
+      ext.storage.sync.set(payload, () => {
         const success = !ext.runtime.lastError;
         resolve(success);
       });
@@ -403,7 +395,7 @@ function showStatusDialog(text, duration = 0) {
       backgroundColor: '#333', color: '#fff', padding: '12px 24px',
       borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
       zIndex: '2147483647', fontFamily: 'system-ui, sans-serif',
-      fontSize: '20px', fontWeight: '600', textAlign: 'center',
+      fontSize: '16px', fontWeight: '600', textAlign: 'center',
       pointerEvents: 'none', transition: 'opacity 0.2s'
     });
     dialog.setAttribute('role', 'alert');
@@ -433,9 +425,6 @@ function hideStatusDialog() {
   }
 }
 
-/* ==========================================================================
-   6. UI OVERLAY & MESSAGING
-   ========================================================================== */
 function triggerFromPayload(payload) {
   if (payload.selector) {
     try {
@@ -453,6 +442,7 @@ ext.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "trigger") triggerFromPayload(message);
   if (message.action === "toggle_overlay") toggleOverlay();
   if (message.action === "quick_capture") performQuickCapture();
+  if (message.action === "mouse_capture") performMouseCapture();
 });
 
 // --- SETTINGS OVERLAY UI ---
@@ -461,8 +451,13 @@ const IFRAME_ID = 'z-webkeybind-iframe';
 
 function createOverlay() {
   if (document.getElementById(OVERLAY_ID)) { showOverlay(); return; }
+  
+  // FIX: Pass the current hostname in the URL params
+  const hostname = window.location.hostname;
+  const popupUrl = ext.runtime.getURL(`popup.html?hostname=${encodeURIComponent(hostname)}`);
+
   const style = document.createElement('style');
-  style.textContent = `#${OVERLAY_ID} { position: fixed; left: 50%; top: 10%; transform: translateX(-50%); width: 700px; max-width: 95%; height: 560px; z-index: 2147483647; box-shadow: 0 10px 40px rgba(0,0,0,0.5); border-radius: 8px; overflow: hidden; background: white; display: none; } .zwb-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2147483646; display: none; } .zwb-frame { width: 100%; height: 100%; border: 0; } .zwb-close { position: absolute; right: 10px; top: 10px; background: #000000; color: #ffffff; border: 1px solid #ccc; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-family: sans-serif; font-size: 13px; font-weight: bold; z-index: 2147483648; }`;
+  style.textContent = `#${OVERLAY_ID} { position: fixed; left: 50%; top: 10%; transform: translateX(-50%); width: 620px; max-width: 95%; height: 450px; z-index: 2147483647; box-shadow: 0 10px 40px rgba(0,0,0,0.5); border-radius: 8px; overflow: hidden; background: white; display: none; } .zwb-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2147483646; display: none; } .zwb-frame { width: 100%; height: 100%; border: 0; } .zwb-close { position: absolute; right: 10px; top: 10px; background: #000000; color: #ffffff; border: 1px solid #ccc; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-family: sans-serif; font-size: 13px; font-weight: bold; z-index: 2147483648; }`;
   document.head.appendChild(style);
   
   const backdrop = document.createElement('div');
@@ -483,7 +478,9 @@ function createOverlay() {
   const iframe = document.createElement('iframe');
   iframe.className = 'zwb-frame';
   iframe.id = IFRAME_ID;
-  iframe.src = ext.runtime.getURL('popup.html');
+  
+  // Use the new URL with hostname
+  iframe.src = popupUrl;
   
   container.appendChild(closeBtn);
   container.appendChild(iframe);
@@ -524,7 +521,6 @@ function toggleOverlay() {
 }
 
 window.addEventListener("load", () => {
-  // Prevent screen reader from reading the first button on load
   if (document.activeElement && document.activeElement.tagName === "BUTTON") {
     document.activeElement.blur();
   }
