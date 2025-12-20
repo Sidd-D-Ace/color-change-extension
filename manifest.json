@@ -54,6 +54,12 @@
         "default": "Ctrl+Alt+C"
       },
       "description": "Turns on Quick Capture Mode"
+    },
+    "mouse-capture":  {
+      "suggested_key" :{
+        "default": "Alt+M"
+      },
+      "description": "Turns on Mouse Capture Mode"
     }
   }
 }

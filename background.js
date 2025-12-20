@@ -72,6 +72,10 @@ function quickCaptureOnPage(){
   sendMessageToActiveTab({ action: "quick_capture" });
 }
 
+function mouseCaptureOnPage(){
+  sendMessageToActiveTab({action: "mouse_capture"});
+}
+
 
 // 2. COMMAND LISTENER
 ext.commands && ext.commands.onCommand.addListener((command) => {
@@ -85,6 +89,12 @@ ext.commands && ext.commands.onCommand.addListener((command) => {
   if (command === "quick-capture") {
     console.log("[KeySight BG] Quick Capture Mode ON");
     quickCaptureOnPage();
+    return;
+  }
+
+  if (command === "mouse-capture") {
+    console.log("[KeySight BG] Mouse Capture Mode ON");
+    mouseCaptureOnPage();
     return;
   }
 
