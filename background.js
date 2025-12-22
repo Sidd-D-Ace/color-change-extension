@@ -1,12 +1,9 @@
 // background.js (MV2 event page) - KeySight
-//# sourceURL=keysight_script.js;
 const ext = (typeof browser !== "undefined") ? browser : chrome;
 
 console.log("[KeySight BG] Background loaded.");
 
 // 1. HELPERS
-
-// We simply send the message. If the page hasn't reloaded, we catch the error silently.
 function sendMessageToActiveTab(payload) {
   ext.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (!tabs || !tabs[0]) return;
@@ -24,10 +21,6 @@ function sendMessageToActiveTab(payload) {
   });
 }
 
-function openSettingsOverlayOnPage() {
-  sendMessageToActiveTab({ action: "toggle_overlay" });
-}
-
 function quickCaptureOnPage(){
   sendMessageToActiveTab({ action: "quick_capture" });
 }
@@ -36,15 +29,10 @@ function mouseCaptureOnPage(){
   sendMessageToActiveTab({action: "mouse_capture"});
 }
 
-
 // 2. COMMAND LISTENER
 ext.commands && ext.commands.onCommand.addListener((command) => {
   
-  if (command === "open-settings") {
-    console.log("[KeySight BG] Opening settings overlay");
-    openSettingsOverlayOnPage();
-    return;
-  }
+  // NOTE: "open-settings" is handled natively via _execute_browser_action in manifest
 
   if (command === "quick-capture") {
     console.log("[KeySight BG] Quick Capture Mode ON");
@@ -57,8 +45,4 @@ ext.commands && ext.commands.onCommand.addListener((command) => {
     mouseCaptureOnPage();
     return;
   }
-});
-
-ext.runtime && ext.runtime.onInstalled && ext.runtime.onInstalled.addListener(() => {
-  console.log('[KeySight BG] Installed/Updated.');
 });

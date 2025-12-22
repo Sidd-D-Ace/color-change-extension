@@ -1,4 +1,4 @@
-/* popup.js - KeySight: Per-Site Settings (URL Param Fix) */
+/* popup.js - KeySight: Fixed "Ghost Row" Glitch */
 const ext = (typeof chrome !== 'undefined') ? chrome : browser;
 
 // DOM references
@@ -20,12 +20,8 @@ window.addEventListener('mouseup', () => { setTimeout(() => { __ct_isClicking = 
    DEFAULTS
    -------------------------------------------------------------------------- */
 function defaultMappings() {
-  return [{ 
-    colorName: "Trigger 1", 
-    selector: "", 
-    shortcut: "", 
-    entryType: "manual" 
-  }];
+  // FIX: Return empty array so no "ghost" row appears automatically
+  return [];
 }
 
 function getStorageKey() {
@@ -108,9 +104,11 @@ function renderRows(mappings) {
   rowsContainer.innerHTML = '';
   
   (mappings || []).forEach((map, i) => {
+    // Ensure we handle missing fields gracefully
     const safeMap = map || { colorName: `Trigger ${i+1}`, selector: '', shortcut: '', entryType: 'manual'};
     rowsContainer.appendChild(buildRow(i, safeMap));
   });
+  
   attachRecorders();
 }
 
@@ -124,6 +122,8 @@ function addNewRow(){
   };
   currentMappings.push(newRow);
   renderRows(currentMappings);
+  // Don't auto-save empty rows immediately if you prefer, 
+  // but saving here ensures the UI state persists.
   saveMappings(currentMappings); 
   return currentMappings;
 }
@@ -326,7 +326,6 @@ function saveMappings(mappings) {
 }
 
 function loadMappings(cb) {
-  // 1. Check URL Parameters (Overlay Mode)
   const params = new URLSearchParams(window.location.search);
   const paramHost = params.get('hostname');
 
@@ -334,13 +333,10 @@ function loadMappings(cb) {
     currentHostname = paramHost;
     fetchStorage(cb);
   } else {
-    // 2. Fallback to Tabs API (Toolbar Popup Mode)
-    // Safe check for tabs API existence
     if (ext.tabs && ext.tabs.query) {
       try {
         ext.tabs.query({ active: true, currentWindow: true }, (tabs) => {
            if (ext.runtime.lastError) {
-             console.log("Tabs query error:", ext.runtime.lastError);
              currentHostname = "Global";
            } else if (tabs && tabs[0] && tabs[0].url) {
              try {
@@ -369,11 +365,8 @@ function fetchStorage(cb) {
       ext.storage.sync.get(key, (res) => {
         console.log("[KeySight Popup] Data loaded:", res);
         const data = (res && res[key] && Array.isArray(res[key])) ? res[key] : [];
-        if (data.length === 0) {
-          cb(defaultMappings());
-        } else {
-          cb(data);
-        }
+        // FIX: Just pass the data (even if empty). Do NOT call defaultMappings() here.
+        cb(data);
       });
     } else {
        console.error("Storage API unavailable");
@@ -383,8 +376,6 @@ function fetchStorage(cb) {
 
 // ⚠️ INITIALIZATION
 document.addEventListener('DOMContentLoaded', () => {
-  console.log("[KeySight Popup] DOM Loaded");
-  
   rowsContainer = document.getElementById('rows');
   resetBtn = document.getElementById('resetBtn');
   helpBtn = document.getElementById('helpShortcuts');
@@ -402,6 +393,7 @@ document.addEventListener('DOMContentLoaded', () => {
     resetBtn.textContent = "Clear All";
     resetBtn.addEventListener('click', async () => {
       if(confirm("Delete all settings for " + currentHostname + "?")) {
+         // FIX: defaultMappings() is now empty [], so this properly clears the UI
          const defs = defaultMappings();
          renderRows(defs);
          await saveMappings(defs); 

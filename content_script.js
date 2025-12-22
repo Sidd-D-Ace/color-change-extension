@@ -1,17 +1,17 @@
-/* content_script.js - KeySight: Shortcuts + Settings Overlay (MV3 Compatible) */
+/* content_script.js - KeySight: Native Popup Edition */
 
 const ext = (typeof browser !== "undefined") ? browser : chrome;
+
+// --- STATE VARIABLES ---
 let isRecordingState = false; 
 let capturedElement = null; 
 let currentHighlightedElement = null;
 let isMouseMode = false;
-let mouseHighlightTarget = null;
 let storedMappings = [];
 let quickCaptureParts = [];
 
-// --- GUARD: Prevent double-injection ---
+// --- GUARD ---
 if (window.hasKeySightRun) {
-  // throw new Error("KeySight content script already exists"); 
 } else {
   window.hasKeySightRun = true;
   console.log("[KeySight] Content script loaded.");
@@ -40,7 +40,90 @@ ext.storage.onChanged.addListener((changes) => {
 });
 
 /* ==========================================================================
-   2. KEYBOARD LISTENERS
+   2. ROBUST ENGINE (Fingerprinting & Healing)
+   ========================================================================== */
+
+function generateFingerprint(el) {
+    return {
+        id: (el.id && !el.id.match(/[0-9a-f]{8}-[0-9a-f]{4}/)) ? el.id : null,
+        ariaLabel: el.getAttribute('aria-label') || 
+                   (el.parentElement ? el.parentElement.getAttribute('aria-label') : null) || 
+                   el.innerText?.substring(0, 30).trim(), 
+        className: (typeof el.className === 'string') ? el.className.trim() : null,
+        structural: getNthChildSelector(el),
+        tagName: el.tagName.toLowerCase()
+    };
+}
+
+function getNthChildSelector(el) {
+    if (!el || !el.parentNode) return null;
+    let count = 1;
+    let sib = el;
+    while ((sib = sib.previousElementSibling)) count++;
+    return `${el.tagName.toLowerCase()}:nth-child(${count})`;
+}
+
+// SELF-HEALING: Updates storage if fallback was used
+function healFingerprint(foundElement, map, index) {
+    const newFingerprint = generateFingerprint(foundElement);
+    const oldFingerprint = map.fingerprint || {};
+
+    if (oldFingerprint.id !== newFingerprint.id || oldFingerprint.structural !== newFingerprint.structural) {
+        console.log("KeySight: Healing broken link...", map.selector);
+        
+        storedMappings[index].fingerprint = newFingerprint;
+        storedMappings[index].selector = newFingerprint.ariaLabel 
+            ? `[aria-label="${newFingerprint.ariaLabel}"]` 
+            : (newFingerprint.id ? `#${newFingerprint.id}` : newFingerprint.structural);
+
+        saveMappings(storedMappings);
+    }
+}
+
+function getElementByFingerprint(fp) {
+    if (!fp) return null;
+
+    // 1. PRIMARY: Check ARIA Label
+    if (fp.ariaLabel) {
+        try {
+            const el = document.querySelector(`[aria-label="${CSS.escape(fp.ariaLabel)}"]`);
+            if (el && isVisible(el)) return el;
+        } catch(e) {}
+        try {
+            const candidates = document.querySelectorAll(`[aria-label*="${CSS.escape(fp.ariaLabel)}"]`);
+            for (let el of candidates) { if(isVisible(el)) return el; }
+        } catch (e) {}
+    }
+
+    // 2. SECONDARY: Check ID
+    if (fp.id) {
+        const el = document.getElementById(fp.id);
+        if (el && isVisible(el)) return el;
+    }
+
+    // 3. TERTIARY: Structural
+    if (fp.structural) {
+        try {
+            const candidates = document.querySelectorAll(fp.structural);
+            for(let el of candidates) {
+                if (fp.className && !el.classList.contains(fp.className.split(' ')[0])) continue;
+                if (isVisible(el)) return el;
+            }
+        } catch (e) {}
+    }
+    return null;
+}
+
+function isVisible(el) {
+    return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+}
+
+function getInteractiveTarget(target) {
+    return target.closest('button, a, input, select, textarea, [role="button"], [tabindex]') || target;
+}
+
+/* ==========================================================================
+   3. KEYBOARD LISTENER (Trigger & Recording)
    ========================================================================== */
 function getKeyName(e) {
   if (e.code) {
@@ -66,16 +149,12 @@ window.addEventListener('keyup', (e) => {
     }
 
     quickCaptureParts = [];
-
     if (capturedElement) {
       capturedElement.style.border = "";
       capturedElement.style.outline = "";
       capturedElement = null;
     }
-    
-    if (isMouseMode) {
-        disableMouseMode();
-    }
+    if (isMouseMode) disableMouseMode();
 
     showStatusDialog(`Saved: ${currentCombo}`, 2000);
     return;
@@ -108,10 +187,9 @@ window.addEventListener("keydown", (e) => {
   }
   const combo = parts.join("+");
 
+  // RECORDING LOGIC
   if (isRecordingState) {
-    e.preventDefault();
-    e.stopPropagation();
-
+    e.preventDefault(); e.stopPropagation();
     for (let i = 0; i < storedMappings.length; i++) {
       const map = storedMappings[i];
       if (!map || map.shortcut === '') continue;
@@ -127,91 +205,91 @@ window.addEventListener("keydown", (e) => {
     return;
   }
 
+  // HOTKEYS
   if (e.altKey && mainKey === "C" && !isMouseMode) {
-    e.preventDefault();
-    performQuickCapture();
-    return;
+    e.preventDefault(); performQuickCapture(); return;
   }
-
   if (e.altKey && mainKey === "M") {
-    e.preventDefault();
-    performMouseCapture();
-    return;
+    e.preventDefault(); performMouseCapture(); return;
   }
-
   if (isMouseMode && e.key === "Escape") {
-    disableMouseMode();
-    showStatusDialog("Mouse Capture Cancelled", 2000);
-    return;
+    disableMouseMode(); showStatusDialog("Mouse Capture Cancelled", 2000); return;
   }
-
   if (isMouseMode) return; 
 
+  // TRIGGER LOGIC
   const currentComboLower = combo.toLowerCase();
   for (let i = 0; i < storedMappings.length; i++) {
     const map = storedMappings[i];
     if (!map || !map.shortcut) continue;
 
     if (currentComboLower === map.shortcut.toLowerCase()) {
-      e.preventDefault();
-      e.stopPropagation();
-      triggerFromPayload({ ...map, index: i });
+      e.preventDefault(); e.stopPropagation();
+      
+      const fp = map.fingerprint; 
+      
+      // 1. Legacy fallback
+      if (!fp) {
+         try {
+             const el = document.querySelector(map.selector);
+             if (el) { el.click(); return; }
+         } catch(e){}
+      }
+
+      // 2. Robust Engine
+      const btn = getElementByFingerprint(fp);
+      if (btn) {
+          btn.click();
+          healFingerprint(btn, map, i); 
+          return;
+      }
+      
+      showStatusDialog("Element not found.", 2000);
       return;
     }
   }
 }, true);
 
 /* ==========================================================================
-   3. MOUSE LISTENERS
+   4. CAPTURE MODES
    ========================================================================== */
 document.addEventListener("mouseover", (e) => {
   if (!isMouseMode) return;
   e.stopPropagation();
 
-  if (currentHighlightedElement === e.target) return;
-  if (e.target === document.body || e.target === document.documentElement) return;
+  const target = getInteractiveTarget(e.target);
 
-  if (currentHighlightedElement) {
-    currentHighlightedElement.style.outline = "";
-  }
+  if (currentHighlightedElement === target) return;
+  if (target === document.body || target === document.documentElement) return;
 
-  e.target.style.outline = "4px solid #fc0303";
-  currentHighlightedElement = e.target;
+  if (currentHighlightedElement) currentHighlightedElement.style.outline = "";
+  
+  target.style.outline = "4px solid #fc0303";
+  currentHighlightedElement = target;
 });
 
 document.addEventListener("mouseout", (e) => {
   if (!isMouseMode) return;
-  if (e.target) {
-    e.target.style.outline = "";
-  }
+  if (currentHighlightedElement) currentHighlightedElement.style.outline = "";
 });
 
 document.addEventListener("click", (e) => {
   if (!isMouseMode) return;
-  e.preventDefault();
-  e.stopPropagation();
-  e.stopImmediatePropagation();
-
-  const target = e.target;
+  e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+  
+  const target = getInteractiveTarget(e.target);
   
   if(currentHighlightedElement) {
       currentHighlightedElement.style.outline = "";
       currentHighlightedElement = null;
   }
-
-  mouseCaptureHandler(target);
+  captureHandler(target);
 }, true);
 
-/* ==========================================================================
-   4. CAPTURE LOGIC
-   ========================================================================== */
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 function performMouseCapture() {
-  if (isMouseMode) {
-    disableMouseMode();
-    return;
-  }
+  if (isMouseMode) { disableMouseMode(); return; }
   isMouseMode = true;
   document.body.style.cursor = 'crosshair';
   showStatusDialog("Mouse Capture ON. Click an element.", 0);
@@ -227,74 +305,51 @@ function disableMouseMode() {
   hideStatusDialog();
 }
 
-async function mouseCaptureHandler(target) {
-  isMouseMode = false;
-  document.body.style.cursor = 'auto';
-  await selectorHandler(target);
-}
-
 async function performQuickCapture() {
   const target = document.activeElement;
   if (!target || target === document.body) {
     showStatusDialog("No element selected. Tab to a button first.", 3000);
     return;
   }
-
   target.style.border = "thick solid #fc0303";
   capturedElement = target; 
   showStatusDialog("Quick Capture ON: Analyzing...", 0);
-  
-  await delay(1000);
-  await selectorHandler(target);
+  await delay(500);
+  await captureHandler(target);
 }
 
-async function selectorHandler(target) {
+/* ==========================================================================
+   5. SAVING LOGIC
+   ========================================================================== */
+async function captureHandler(target) {
   if (!target) return;
-
   capturedElement = target;
   target.style.border = "thick solid #fc0303"; 
 
-  if (target.id) {
-    const newId = quickCaptureNormalize(target.id, 'id');
-    if (await quickCaptureCheck(newId)) {
-      showStatusDialog("Trigger Already Exists.", 3000);
-      target.style.border = "";
-      return;
-    }
-    await saveNewTrigger(newId);
+  const fingerprint = generateFingerprint(target);
+
+  let displaySelector = target.tagName.toLowerCase();
+  if (fingerprint.ariaLabel) displaySelector = `[aria-label="${fingerprint.ariaLabel}"]`;
+  else if (fingerprint.id) displaySelector = `#${fingerprint.id}`;
+  else if (fingerprint.structural) displaySelector = fingerprint.structural;
+
+  if (await quickCaptureCheck(fingerprint)) {
+    showStatusDialog("Trigger Already Exists.", 3000);
+    target.style.border = "";
     return;
   }
 
-  if (target.className && typeof target.className === 'string' && target.className.trim() !== "") {
-    const newClass = quickCaptureNormalize(target.className, 'class');
-    if (await quickCaptureCheck(newClass)) {
-      showStatusDialog("Trigger Already Exists.", 3000);
-      target.style.border = "";
-      return;
-    }
-    await saveNewTrigger(newClass);
-    return;
-  }
+  const newTrigger = { 
+    selector: displaySelector, 
+    shortcut: '', 
+    entryType: 'quick-capture',
+    fingerprint: fingerprint 
+  };
 
-  if (target.getAttribute('aria-label')) {
-    const newSelector = `[aria-label="${target.getAttribute('aria-label')}"]`;
-    if (await quickCaptureCheck(newSelector)) {
-      showStatusDialog("Trigger Already Exists.", 3000);
-      target.style.border = "";
-      return;
-    }
-    await saveNewTrigger(newSelector);
-    return;
-  }
-
-  showStatusDialog("Could not capture element (No ID/Class).", 3000);
-  target.style.border = "";
-  target.style.outline = "";
+  await saveNewTrigger(newTrigger);
 }
 
-async function saveNewTrigger(selector) {
-  const newQuickCapture = { selector: selector, shortcut: '', entryType: 'quick-capture' };
-
+async function saveNewTrigger(triggerObj) {
   await new Promise(r => {
       const key = getStorageKey();
       ext.storage.sync.get(key, (res) => {
@@ -303,72 +358,24 @@ async function saveNewTrigger(selector) {
       });
   });
 
-  storedMappings.push(newQuickCapture);
+  storedMappings.push(triggerObj);
   await saveMappings(storedMappings);
   
   showStatusDialog("Element Captured. Press shortcut keys now...", 0);
   isRecordingState = true;
 }
 
-/* ==========================================================================
-   5. HELPERS
-   ========================================================================== */
-function quickCaptureNormalize(input, type) {
-  if (type === 'id') return `[id="${input}"]`;
-
-  if (type === 'class') {
-    const classes = input.trim().split(/\s+/);
-    const exactIgnored = ['focus', 'focused', 'active', 'selected', 'hover', 'visibly-focused'];
-    const ignoredPatterns = [/[-_]focused$/i, /[-_]active$/i, /^ng-/i];
-
-    const cleanClasses = classes.filter(cls => {
-      if (exactIgnored.includes(cls)) return false;
-      if (ignoredPatterns.some(regex => regex.test(cls))) return false;
-      return true;
-    });
-
-    if (cleanClasses.length === 0) return '.' + input.trim().replace(/\s+/g, '.');
-    return '.' + cleanClasses.join('.');
-  }
-  return input;
-}
-
-async function quickCaptureCheck(input) {
-  const freshMappings = await new Promise((resolve) => {
-    const key = getStorageKey();
-    ext.storage.sync.get(key, (res) => {
-      resolve(res[key] || []);
-    });
+// --- UTILS ---
+async function quickCaptureCheck(fp) {
+  return storedMappings.some(m => {
+    if (!m.fingerprint) return false;
+    if (fp.id && m.fingerprint.id === fp.id) return true;
+    if (fp.ariaLabel && m.fingerprint.ariaLabel === fp.ariaLabel) return true;
+    return false;
   });
-
-  storedMappings = freshMappings;
-  let newStoredMappings = [...storedMappings];
-  let foundDuplicate = false;
-
-  for (let i = 0; i < storedMappings.length; i++) {
-    const map = storedMappings[i];
-    if (!map || map.selector === '') continue;
-
-    if (input === map.selector) {
-      if (map.shortcut !== '') {
-        foundDuplicate = true;
-      } else {
-        newStoredMappings = newStoredMappings.filter(item => item.selector !== input);
-      }
-    }
-  }
-
-  if (!foundDuplicate && newStoredMappings.length !== storedMappings.length) {
-    await saveMappings(newStoredMappings);
-    storedMappings = newStoredMappings;
-  }
-
-  return foundDuplicate;
 }
 
-function joinParts(parts) {
-  quickCaptureParts = [...parts];
-}
+function joinParts(parts) { quickCaptureParts = [...parts]; }
 
 function saveMappings(mappings) {
   return new Promise((resolve) => {
@@ -376,10 +383,8 @@ function saveMappings(mappings) {
       const key = getStorageKey();
       const payload = {};
       payload[key] = mappings;
-      
       ext.storage.sync.set(payload, () => {
-        const success = !ext.runtime.lastError;
-        resolve(success);
+        resolve(!ext.runtime.lastError);
       });
     } catch (e) { resolve(false); }
   });
@@ -398,17 +403,12 @@ function showStatusDialog(text, duration = 0) {
       fontSize: '16px', fontWeight: '600', textAlign: 'center',
       pointerEvents: 'none', transition: 'opacity 0.2s'
     });
-    dialog.setAttribute('role', 'alert');
-    dialog.setAttribute('aria-live', 'assertive');
     document.body.appendChild(dialog);
   }
-
   dialog.textContent = text;
   dialog.style.opacity = '1';
   dialog.style.display = 'block';
-
   if (dialog._timeoutId) clearTimeout(dialog._timeoutId);
-
   if (duration > 0) {
     dialog._timeoutId = setTimeout(() => {
       dialog.style.opacity = '0';
@@ -416,112 +416,15 @@ function showStatusDialog(text, duration = 0) {
     }, duration);
   }
 }
-
 function hideStatusDialog() {
   const dialog = document.getElementById('ks-status-dialog');
-  if (dialog) {
-    dialog.style.opacity = '0';
-    setTimeout(() => { dialog.style.display = 'none'; }, 200);
-  }
+  if (dialog) { dialog.style.opacity = '0'; setTimeout(() => { dialog.style.display = 'none'; }, 200); }
 }
 
-function triggerFromPayload(payload) {
-  if (payload.selector) {
-    try {
-      const el = document.querySelector(payload.selector);
-      if (el) {
-        el.click();
-        return;
-      }
-    } catch (e) {}
-  }
-}
-
+// --- MESSAGING ---
 ext.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.action) return;
-  if (message.action === "trigger") triggerFromPayload(message);
-  if (message.action === "toggle_overlay") toggleOverlay();
+  // toggle_overlay REMOVED because browser handles it now
   if (message.action === "quick_capture") performQuickCapture();
   if (message.action === "mouse_capture") performMouseCapture();
-});
-
-// --- SETTINGS OVERLAY UI ---
-const OVERLAY_ID = 'z-webkeybind-overlay';
-const IFRAME_ID = 'z-webkeybind-iframe';
-
-function createOverlay() {
-  if (document.getElementById(OVERLAY_ID)) { showOverlay(); return; }
-  
-  // FIX: Pass the current hostname in the URL params
-  const hostname = window.location.hostname;
-  const popupUrl = ext.runtime.getURL(`popup.html?hostname=${encodeURIComponent(hostname)}`);
-
-  const style = document.createElement('style');
-  style.textContent = `#${OVERLAY_ID} { position: fixed; left: 50%; top: 10%; transform: translateX(-50%); width: 620px; max-width: 95%; height: 450px; z-index: 2147483647; box-shadow: 0 10px 40px rgba(0,0,0,0.5); border-radius: 8px; overflow: hidden; background: white; display: none; } .zwb-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2147483646; display: none; } .zwb-frame { width: 100%; height: 100%; border: 0; } .zwb-close { position: absolute; right: 10px; top: 10px; background: #000000; color: #ffffff; border: 1px solid #ccc; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-family: sans-serif; font-size: 13px; font-weight: bold; z-index: 2147483648; }`;
-  document.head.appendChild(style);
-  
-  const backdrop = document.createElement('div');
-  backdrop.className = 'zwb-backdrop';
-  backdrop.onclick = hideOverlay;
-  
-  const container = document.createElement('div');
-  container.id = OVERLAY_ID;
-  container.setAttribute('role', 'dialog');
-  container.setAttribute('aria-modal', 'true');
-  container.setAttribute('aria-label', 'z.WebKeyBind Settings');
-  
-  const closeBtn = document.createElement('button');
-  closeBtn.className = 'zwb-close';
-  closeBtn.innerText = 'Close';
-  closeBtn.onclick = hideOverlay;
-  
-  const iframe = document.createElement('iframe');
-  iframe.className = 'zwb-frame';
-  iframe.id = IFRAME_ID;
-  
-  // Use the new URL with hostname
-  iframe.src = popupUrl;
-  
-  container.appendChild(closeBtn);
-  container.appendChild(iframe);
-  document.body.appendChild(backdrop);
-  document.body.appendChild(container);
-  
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && container.style.display !== 'none') hideOverlay();
-  });
-  
-  showOverlay();
-}
-
-function showOverlay() {
-  const c = document.getElementById(OVERLAY_ID);
-  const b = document.querySelector('.zwb-backdrop');
-  if (c && b) {
-    c.style.display = 'block';
-    b.style.display = 'block';
-    setTimeout(() => {
-        const iframe = document.getElementById(IFRAME_ID);
-        if (iframe) { iframe.focus(); try { iframe.contentWindow.focus(); } catch(e){} }
-    }, 150);
-  } else { createOverlay(); }
-}
-
-function hideOverlay() {
-  const c = document.getElementById(OVERLAY_ID);
-  const b = document.querySelector('.zwb-backdrop');
-  if (c) c.style.display = 'none';
-  if (b) b.style.display = 'none';
-  if (document.activeElement) document.activeElement.blur();
-}
-
-function toggleOverlay() {
-  const c = document.getElementById(OVERLAY_ID);
-  if (c && c.style.display === 'block') hideOverlay(); else showOverlay();
-}
-
-window.addEventListener("load", () => {
-  if (document.activeElement && document.activeElement.tagName === "BUTTON") {
-    document.activeElement.blur();
-  }
 });
