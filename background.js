@@ -1,7 +1,9 @@
-// background.js (MV2 event page) - KeySight
+// background.js (MV3 Service Worker) - KeySight
+
+// In MV3 Service Workers, 'window' is undefined, so we check for 'chrome' vs 'browser' directly.
 const ext = (typeof browser !== "undefined") ? browser : chrome;
 
-console.log("[KeySight BG] Background loaded.");
+console.log("[KeySight BG] Service Worker loaded.");
 
 // 1. HELPERS
 function sendMessageToActiveTab(payload) {
@@ -9,10 +11,13 @@ function sendMessageToActiveTab(payload) {
     if (!tabs || !tabs[0]) return;
     const tabId = tabs[0].id;
     
+    // In MV3, we don't need a callback for sendMessage if we don't use the response,
+    // but handling the promise/callback prevents "Unchecked runtime.lastError" in logs.
     try {
-      ext.tabs.sendMessage(tabId, payload, (response) => {
+      ext.tabs.sendMessage(tabId, payload, () => {
         if (ext.runtime.lastError) {
-          console.log("[KeySight] Script not ready. User may need to refresh page.");
+          // Tab probably hasn't loaded the content script yet (e.g. new tab page)
+          // We suppress the error to keep the console clean.
         }
       });
     } catch (e) {
@@ -26,23 +31,30 @@ function quickCaptureOnPage(){
 }
 
 function mouseCaptureOnPage(){
-  sendMessageToActiveTab({action: "mouse_capture"});
+  sendMessageToActiveTab({ action: "mouse_capture" });
 }
 
 // 2. COMMAND LISTENER
-ext.commands && ext.commands.onCommand.addListener((command) => {
-  
-  // NOTE: "open-settings" is handled natively via _execute_browser_action in manifest
+if (ext.commands) {
+  ext.commands.onCommand.addListener((command) => {
+    
+    // Note: "_execute_action" is handled natively by the browser.
+    
+    if (command === "quick-capture") {
+      console.log("[KeySight BG] Quick Capture");
+      quickCaptureOnPage();
+    }
 
-  if (command === "quick-capture") {
-    console.log("[KeySight BG] Quick Capture Mode ON");
-    quickCaptureOnPage();
-    return;
-  }
+    if (command === "mouse-capture") {
+      console.log("[KeySight BG] Mouse Capture");
+      mouseCaptureOnPage();
+    }
+  });
+}
 
-  if (command === "mouse-capture") {
-    console.log("[KeySight BG] Mouse Capture Mode ON");
-    mouseCaptureOnPage();
-    return;
-  }
-});
+// 3. INSTALL LISTENER
+if (ext.runtime && ext.runtime.onInstalled) {
+  ext.runtime.onInstalled.addListener(() => {
+    console.log('[KeySight BG] Installed/Updated.');
+  });
+}
