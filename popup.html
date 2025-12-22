@@ -7,15 +7,20 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-  <main id="main" role="dialog" aria-labelledby="title" aria-modal="false">
-    
-    <h1 id="title">KeySight — Settings</h1>
+  <button id="a11y-start" class="sr-only" style="position:absolute; opacity:0;">
+    KeySight Settings. Press Tab to begin.
+  </button>
 
-    <div id="start-message" tabindex="-1" class="sr-only" style="outline:none;">
-      KeySight loaded. Press Ctrl + Alt + E to open this box later.
-    </div>
-
-    <p id="desc">Configure triggers. Changes are <strong>saved automatically</strong>.</p>
+  <main id="main">
+    <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <div>
+        <h1 id="title">KeySight</h1>
+        <p id="desc" style="margin:0;">Manage your triggers</p>
+      </div>
+      <button id="readAllBtn" type="button" aria-label="Read all shortcuts">
+        🔊 Read All
+      </button>
+    </header>
 
     <div id="announce" role="status" aria-live="polite" class="sr-only"></div>
 
@@ -24,14 +29,18 @@
         <thead>
           <tr>
             <th scope="col">#</th>
-            <th scope="col">Button selector / ID</th>
+            <th scope="col">Trigger</th>
             <th scope="col">Shortcut</th>
             <th scope="col"></th>
           </tr>
         </thead>
         <tbody id="rows"></tbody>
       </table>
-      <button id="addBtn" type="button">+ Add New</button>
+      
+      <div style="margin-top: 10px;">
+        <button id="addBtn" type="button">+ Add New</button>
+      </div>
+
       <div class="controls">
         <button id="resetBtn" type="button">Clear All</button>
         <button id="helpShortcuts" type="button">Help</button>

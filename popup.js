@@ -1,111 +1,149 @@
-/* popup.js - KeySight: Fixed "Ghost Row" Glitch */
+/* popup.js - KeySight: Bulletproof Focus */
 const ext = (typeof chrome !== 'undefined') ? chrome : browser;
 
 // DOM references
 let rowsContainer;
 let resetBtn;
 let helpBtn;
+let readAllBtn;
 let error;
 let addBtn;
 let title;
 
 let __ct_isClicking = false;
 let currentHostname = "Global"; 
+let currentData = [];
 
 window.addEventListener('mousedown', () => { __ct_isClicking = true; }, true);
 window.addEventListener('mouseup', () => { setTimeout(() => { __ct_isClicking = false; }, 100); }, true);
 
-
 /* --------------------------------------------------------------------------
-   DEFAULTS
+   DEFAULTS & STORAGE
    -------------------------------------------------------------------------- */
-function defaultMappings() {
-  // FIX: Return empty array so no "ghost" row appears automatically
-  return [];
-}
+function defaultMappings() { return []; }
+function getStorageKey() { return "keysight_" + currentHostname; }
 
-function getStorageKey() {
-  return "keysight_" + currentHostname;
-}
-
-/* --------------------------------------------------------------------------
-   Auto-Save Logic
-   -------------------------------------------------------------------------- */
 async function performAutoSave() {
   const mappings = collectRows();
-  
-  if (typeof highlightRows === 'function') highlightRows([]);
   if (error) error.classList.remove('visible');
-
-  const dups = findDuplicateShortcuts(mappings);
-  if (dups.length > 0) {
-    if (typeof highlightRows === 'function') highlightRows(dups);
-    showStatus("Duplicate shortcuts detected. Not saved.", "error");
-    return;
-  }
-
   const ok = await saveMappings(mappings);
-  if (ok) showStatus("Saved for " + currentHostname, "saved");
-  else showStatus("Error saving settings", "error");
+  if (ok) {
+    currentData = mappings; 
+    showStatus("Saved", "saved");
+  } else {
+    showStatus("Error saving settings", "error");
+  }
 }
 
-
 /* --------------------------------------------------------------------------
-   Rendering
+   RENDERING
    -------------------------------------------------------------------------- */
+function getDisplayName(mapping) {
+  if (mapping.customName) return mapping.customName;
+  if (mapping.fingerprint && mapping.fingerprint.ariaLabel) return mapping.fingerprint.ariaLabel;
+  return "Name this trigger";
+}
+
 function buildRow(index, mapping) {
   const tr = document.createElement('tr');
+  tr.className = 'row-card'; 
   tr.dataset.index = index;
-  const label = mapping.colorName || `Trigger ${index + 1}`;
-
+  
   const tdIndex = document.createElement('td');
+  tdIndex.className = 'col-index';
   tdIndex.textContent = index + 1;
   tr.appendChild(tdIndex);
 
-  const tdSelector = document.createElement('td');
+  const tdMain = document.createElement('td');
+  tdMain.className = 'col-main';
+  
+  const nameRow = document.createElement('div');
+  nameRow.className = 'name-row';
+  
+  const nameText = document.createElement('span');
+  nameText.className = 'trigger-name';
+  const displayName = getDisplayName(mapping);
+  nameText.textContent = displayName;
+  if (displayName === "Name this trigger") nameText.classList.add('placeholder');
+
+  const editIcon = document.createElement('button');
+  editIcon.className = 'icon-btn edit-btn';
+  editIcon.innerHTML = '✎';
+  editIcon.title = "Rename trigger";
+  editIcon.onclick = () => enableNameEditing(nameRow, mapping, index);
+
+  nameRow.appendChild(nameText);
+  nameRow.appendChild(editIcon);
+  tdMain.appendChild(nameRow);
+
+  const inputsRow = document.createElement('div');
+  inputsRow.className = 'inputs-row';
+
   const selectorInput = document.createElement('input');
   selectorInput.type = 'text';
   selectorInput.className = 'selector';
   selectorInput.value = mapping.selector || '';
-  selectorInput.placeholder = index === 0 ? "e.g. #search" : ""; 
+  selectorInput.placeholder = "CSS Selector"; 
   selectorInput.addEventListener('change', performAutoSave);
-  tdSelector.appendChild(selectorInput);
-  tr.appendChild(tdSelector);
-
-  const tdShortcut = document.createElement('td');
+  
   const shortcutInput = document.createElement('input');
   shortcutInput.type = 'text';
   shortcutInput.className = 'shortcut';
   shortcutInput.readOnly = true;
   shortcutInput.value = mapping.shortcut || '';
-  shortcutInput.setAttribute('aria-label', `Shortcut for ${label}`);
-  tdShortcut.appendChild(shortcutInput);
-  tr.appendChild(tdShortcut);
+  shortcutInput.placeholder = "Set Key";
+  shortcutInput.setAttribute('aria-label', `Shortcut for ${displayName}`);
+
+  inputsRow.appendChild(selectorInput);
+  inputsRow.appendChild(shortcutInput);
+  tdMain.appendChild(inputsRow);
+
+  tr.appendChild(tdMain);
 
   const tdDelete = document.createElement('td');
+  tdDelete.className = 'col-delete';
   const deleteBtn = document.createElement('button');
   deleteBtn.type = 'button';
   deleteBtn.innerText = '×'; 
   deleteBtn.className = 'deleteBtn';
   deleteBtn.value = index; 
   deleteBtn.setAttribute('aria-label', `Delete trigger ${index + 1}`);
-  
   tdDelete.appendChild(deleteBtn);
   tr.appendChild(tdDelete);
 
   return tr;
 }
 
-function renderRows(mappings) {
-  if (!rowsContainer) {
-    console.error("Rows container not found!");
-    return;
-  }
-  rowsContainer.innerHTML = '';
+function enableNameEditing(container, mapping, index) {
+  container.innerHTML = '';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'name-edit-input';
+  input.value = mapping.customName || (mapping.fingerprint?.ariaLabel || "");
+  input.placeholder = "Enter name...";
   
-  (mappings || []).forEach((map, i) => {
-    // Ensure we handle missing fields gracefully
-    const safeMap = map || { colorName: `Trigger ${i+1}`, selector: '', shortcut: '', entryType: 'manual'};
+  const saveName = () => {
+    const newName = input.value.trim();
+    currentData[index].customName = newName; 
+    performAutoSave().then(() => renderRows(currentData));
+  };
+
+  input.addEventListener('blur', saveName);
+  input.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') { e.preventDefault(); input.blur(); }
+  });
+
+  container.appendChild(input);
+  input.focus();
+}
+
+function renderRows(mappings) {
+  if (!rowsContainer) return;
+  rowsContainer.innerHTML = '';
+  currentData = mappings || []; 
+  
+  currentData.forEach((map, i) => {
+    const safeMap = map || { selector: '', shortcut: '', entryType: 'manual'};
     rowsContainer.appendChild(buildRow(i, safeMap));
   });
   
@@ -115,29 +153,65 @@ function renderRows(mappings) {
 function addNewRow(){
   const currentMappings = collectRows();
   const newRow = { 
-      colorName: `Trigger ${currentMappings.length + 1}`,
+      customName: "",
       selector: '', 
       shortcut: '', 
-      entryType: 'manual'
+      entryType: 'manual',
+      fingerprint: null
   };
   currentMappings.push(newRow);
-  renderRows(currentMappings);
-  // Don't auto-save empty rows immediately if you prefer, 
-  // but saving here ensures the UI state persists.
-  saveMappings(currentMappings); 
-  return currentMappings;
+  
+  currentData = currentMappings; 
+  renderRows(currentData);
+  saveMappings(currentData); 
 }
 
 function deleteRow(index){
   const currentMappings = collectRows();
   currentMappings.splice(index, 1);
-  renderRows(currentMappings);
-  saveMappings(currentMappings);
-  return currentMappings;
+  currentData = currentMappings;
+  renderRows(currentData);
+  saveMappings(currentData);
+}
+
+function collectRows() {
+  if (!rowsContainer) return [];
+  return Array.from(rowsContainer.querySelectorAll('tr')).map((tr, i) => {
+    const existing = currentData[i] || {};
+    return {
+      ...existing, 
+      selector: tr.querySelector('.selector').value.trim(),
+      shortcut: tr.querySelector('.shortcut').value.trim()
+    };
+  });
 }
 
 /* --------------------------------------------------------------------------
-   Shortcut Recorder
+   VOICE FEATURE
+   -------------------------------------------------------------------------- */
+function readAllShortcuts() {
+  if (currentData.length === 0) {
+    speakText("No shortcuts configured.");
+    return;
+  }
+  const textParts = ["Here are your shortcuts."];
+  currentData.forEach((map, i) => {
+    const name = getDisplayName(map);
+    const keys = map.shortcut ? map.shortcut.split('+').join(' ') : "no key set";
+    textParts.push(`Trigger ${i+1}: ${name}, using ${keys}.`);
+  });
+  speakText(textParts.join(" "));
+}
+
+function speakText(text) {
+  window.speechSynthesis.cancel(); 
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 1.0;
+  window.speechSynthesis.speak(utterance);
+}
+
+/* --------------------------------------------------------------------------
+   SHORTCUT RECORDER
    -------------------------------------------------------------------------- */
 function startRecordingOn(input) {
   if (!input) return;
@@ -153,10 +227,7 @@ function stopRecordingOn(input, save) {
   if (!input) return;
   delete input.dataset.recording;
   input.classList.remove('recording');
-
-  if (!save && input._previousValue !== undefined) {
-    input.value = input._previousValue;
-  }
+  if (!save && input._previousValue !== undefined) input.value = input._previousValue;
   delete input.dataset.activatedByEnter; 
   if (save) performAutoSave();
 }
@@ -187,34 +258,7 @@ function enableShortcutInput(input) {
     startRecordingOn(input);
     updateInputDisplay(input, e);
   });
-  input.addEventListener('paste', (e) => e.preventDefault());
 }
-
-window.addEventListener('keydown', function (e) {
-  const active = document.activeElement;
-  if (!active || !active.classList.contains('shortcut') || active.dataset.recording !== '1') return;
-  if (active.dataset.activatedByEnter === '1' && e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); return; }
-  e.preventDefault(); e.stopPropagation();
-  if (e.key === 'Escape') { stopRecordingOn(active, false); return; }
-  if (e.key === 'Backspace' || e.key === 'Delete') { active.value = ''; return; }
-  updateInputDisplay(active, e);
-}, true);
-
-window.addEventListener('keyup', (e) => {
-  const active = document.activeElement;
-  if (!active || !active.classList.contains('shortcut')) return;
-  if (active.dataset.activatedByEnter === '1' && e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); delete active.dataset.activatedByEnter; return; }
-  if (active.dataset.recording !== '1') return;
-  e.preventDefault(); e.stopPropagation();
-  if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'Delete') return;
-
-  const parts = active.value.split('+');
-  let main = mainKeyFromEvent(e);
-  const normalized = normalizeKeyName(main);
-  if (normalized && !['Ctrl','Alt','Shift','Meta'].includes(normalized)) {
-    stopRecordingOn(active, true);
-  }
-}, true);
 
 function updateInputDisplay(input, e) {
   const parts = [];
@@ -222,64 +266,23 @@ function updateInputDisplay(input, e) {
   if (e.altKey) parts.push('Alt');
   if (e.shiftKey) parts.push('Shift');
   if (e.metaKey) parts.push('Meta');
-  let main = mainKeyFromEvent(e);
-  const normalizedMain = normalizeKeyName(main);
-  if (normalizedMain && !['Ctrl','Alt','Shift','Meta'].includes(normalizedMain)) {
-    if (!parts.includes(normalizedMain)) parts.push(normalizedMain);
-  }
+  let main = e.code.replace(/^(Key|Digit|Numpad)/, '');
+  if(e.key.length === 1) main = e.key.toUpperCase();
+  if (!['Control','Alt','Shift','Meta'].includes(e.key)) parts.push(main);
   input.value = parts.join('+');
 }
 
-function mainKeyFromEvent(e) {
-  if (e.code) {
-    if (/^Digit\d$/i.test(e.code)) return e.code.slice(-1);
-    if (/^Numpad\d$/i.test(e.code)) return e.code.slice(-1);
-    if (/^Key[A-Z]$/i.test(e.code)) return e.code.slice(-1);
-    if (/^Arrow/i.test(e.code) || /^F\d{1,2}$/i.test(e.code)) return e.code;
-  }
-  return e.key || '';
-}
-
-function normalizeKeyName(key) {
-  if (!key) return '';
-  const s = key.toString();
-  if (/^f\d{1,2}$/i.test(s)) return s.toUpperCase();
-  const lk = s.toLowerCase();
-  if (lk === 'control') return 'Ctrl';
-  if (lk === 'meta' || lk === 'command') return 'Meta';
-  if (s.length === 1) return s.toUpperCase();
-  return s[0] ? (s[0].toUpperCase() + s.slice(1)) : s;
-}
-
-function collectRows() {
-  if (!rowsContainer) return [];
-  return Array.from(rowsContainer.querySelectorAll('tr')).map((tr, i) => ({
-    colorName: `Trigger ${i + 1}`, 
-    selector: tr.querySelector('.selector').value.trim(),
-    shortcut: tr.querySelector('.shortcut').value.trim(),
-    entryType: 'manual'
-  }));
-}
-
-function findDuplicateShortcuts(mappings) {
-  const seen = {};
-  const duplicates = new Set();
-  mappings.forEach((m, i) => {
-    const key = (m.shortcut || '').replace(/\s+/g, '').toLowerCase();
-    if (!key) return;
-    if (seen[key] !== undefined) {
-      duplicates.add(i); duplicates.add(seen[key]);
-    } else { seen[key] = i; }
-  });
-  return Array.from(duplicates);
-}
-
-function highlightRows(indices) {
-  if (!rowsContainer) return;
-  document.querySelectorAll('#rows tr').forEach(tr => tr.classList.remove('duplicate'));
-  indices.forEach(i => {
-    const tr = document.querySelector(`#rows tr[data-index='${i}']`);
-    if (tr) tr.classList.add('duplicate');
+/* --------------------------------------------------------------------------
+   STORAGE & UTILS
+   -------------------------------------------------------------------------- */
+function saveMappings(mappings) {
+  return new Promise((resolve) => {
+    try {
+      const key = getStorageKey();
+      const payload = {};
+      payload[key] = mappings;
+      ext.storage.sync.set(payload, () => resolve(!ext.runtime.lastError));
+    } catch(e) { resolve(false); }
   });
 }
 
@@ -299,32 +302,7 @@ function showStatus(msg, type = 'info') {
   }
 }
 
-function attachRecorders() {
-  document.querySelectorAll('.shortcut').forEach(enableShortcutInput);
-}
-
-/* --------------------------------------------------------------------------
-   STORAGE & INIT (Per-Site Logic)
-   -------------------------------------------------------------------------- */
-function saveMappings(mappings) {
-  return new Promise((resolve) => {
-    try {
-      const key = getStorageKey();
-      const payload = {};
-      payload[key] = mappings;
-      
-      if (ext.storage && ext.storage.sync) {
-        ext.storage.sync.set(payload, () => {
-          resolve(!ext.runtime.lastError);
-        });
-      } else {
-        console.error("Storage API unavailable");
-        resolve(false);
-      }
-    } catch(e) { resolve(false); }
-  });
-}
-
+// --- INIT ---
 function loadMappings(cb) {
   const params = new URLSearchParams(window.location.search);
   const paramHost = params.get('hostname');
@@ -334,21 +312,12 @@ function loadMappings(cb) {
     fetchStorage(cb);
   } else {
     if (ext.tabs && ext.tabs.query) {
-      try {
-        ext.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-           if (ext.runtime.lastError) {
-             currentHostname = "Global";
-           } else if (tabs && tabs[0] && tabs[0].url) {
-             try {
-               currentHostname = new URL(tabs[0].url).hostname;
-             } catch(e) { currentHostname = "Global"; }
+      ext.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+           if (!ext.runtime.lastError && tabs && tabs[0] && tabs[0].url) {
+             try { currentHostname = new URL(tabs[0].url).hostname; } catch(e) { currentHostname = "Global"; }
            }
            fetchStorage(cb);
-        });
-      } catch(e) {
-         currentHostname = "Global";
-         fetchStorage(cb);
-      }
+      });
     } else {
       currentHostname = "Global";
       fetchStorage(cb);
@@ -357,54 +326,64 @@ function loadMappings(cb) {
 }
 
 function fetchStorage(cb) {
-    if (title) title.textContent = `z.WebKeyBind: ${currentHostname}`;
-    console.log("[KeySight Popup] Loading for:", currentHostname);
-
+    if (title) title.innerText = `KeySight: ${currentHostname}`;
     const key = getStorageKey();
     if (ext.storage && ext.storage.sync) {
       ext.storage.sync.get(key, (res) => {
-        console.log("[KeySight Popup] Data loaded:", res);
         const data = (res && res[key] && Array.isArray(res[key])) ? res[key] : [];
-        // FIX: Just pass the data (even if empty). Do NOT call defaultMappings() here.
         cb(data);
       });
-    } else {
-       console.error("Storage API unavailable");
-       cb(defaultMappings());
-    }
+    } else { cb([]); }
 }
 
-// ⚠️ INITIALIZATION
+ext.storage.onChanged.addListener((changes, area) => {
+  if (area === 'sync') {
+    const key = getStorageKey();
+    if (changes[key]) renderRows(changes[key].newValue || []);
+  }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
+  window.speechSynthesis.cancel(); // Stop old audio
+
   rowsContainer = document.getElementById('rows');
   resetBtn = document.getElementById('resetBtn');
   helpBtn = document.getElementById('helpShortcuts');
+  readAllBtn = document.getElementById('readAllBtn');
   error = document.getElementById('error');
   addBtn = document.getElementById('addBtn');
   title = document.getElementById('title');
 
-  loadMappings((mappings) => {
-    renderRows(mappings);
-    const firstInput = document.querySelector('input');
-    if (firstInput) firstInput.focus();
-  });
+  // --- FOCUS STRATEGY: Target the Hidden Button ---
+  const a11yStart = document.getElementById('a11y-start');
+  if (a11yStart) {
+      // Use requestAnimationFrame to ensure painting is done
+      requestAnimationFrame(() => {
+          setTimeout(() => {
+              a11yStart.focus();
+          }, 200); // 200ms delay to catch slow renderers
+      });
+  }
+
+  loadMappings((mappings) => { renderRows(mappings); });
+
+  if (readAllBtn) readAllBtn.addEventListener('click', readAllShortcuts);
 
   if (resetBtn) {
-    resetBtn.textContent = "Clear All";
     resetBtn.addEventListener('click', async () => {
       if(confirm("Delete all settings for " + currentHostname + "?")) {
-         // FIX: defaultMappings() is now empty [], so this properly clears the UI
-         const defs = defaultMappings();
-         renderRows(defs);
-         await saveMappings(defs); 
+         currentData = [];
+         renderRows([]);
+         await saveMappings([]); 
          showStatus("All settings cleared", "saved");
+         if(a11yStart) a11yStart.focus();
       }
     });
   }
 
   if (helpBtn) {
     helpBtn.addEventListener('click', () => {
-      alert(`z.WebKeyBind Help for ${currentHostname}:\n\n1. Press "Add New" to add a row.\n2. Enter a Selector.\n3. Click the box on the right and press your shortcut.\n4. Use the "X" button to delete rows.`);
+      alert(`KeySight Help:\n\n1. "Read All" hears your triggers.\n2. Click Pencil to rename.\n3. Click Shortcut box to record.`);
     });
   }
 
@@ -412,27 +391,15 @@ document.addEventListener('DOMContentLoaded', () => {
     rowsContainer.addEventListener("click", async (event) => {
       const btn = event.target.closest('.deleteBtn');
       if(btn){
-        const visualIndex = parseInt(btn.value) + 1;
-        if(confirm(`Delete Trigger ${visualIndex}?`)){
-          const btnIndex = parseInt(btn.value);
-          deleteRow(btnIndex);
+        const visualIndex = parseInt(btn.value);
+        if(confirm(`Delete Trigger ${visualIndex + 1}?`)){
+          deleteRow(visualIndex);
           showStatus("Trigger deleted", "saved");
+          if(addBtn) addBtn.focus(); 
         }
       } 
     });
   }
 
-  if (addBtn) {
-    addBtn.addEventListener('click', async () => {
-      const mapping = addNewRow();
-      const index = mapping.length - 1;
-      setTimeout(() => {
-          const currRow = document.querySelector(`tr[data-index="${index}"]`);
-          if(currRow){
-            const firstInput = currRow.querySelector('input.selector');
-            if(firstInput) firstInput.focus();
-          }
-      }, 50);
-    });
-  }
+  if (addBtn) addBtn.addEventListener('click', addNewRow);
 });

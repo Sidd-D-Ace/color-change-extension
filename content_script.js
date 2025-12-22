@@ -1,4 +1,4 @@
-/* content_script.js - KeySight: Native Popup Edition */
+/* content_script.js - KeySight: Fixed Accessibility Announcer */
 
 const ext = (typeof browser !== "undefined") ? browser : chrome;
 
@@ -15,6 +15,25 @@ if (window.hasKeySightRun) {
 } else {
   window.hasKeySightRun = true;
   console.log("[KeySight] Content script loaded.");
+}
+
+/* ==========================================================================
+   0. ACCESSIBILITY ANNOUNCER (FIXED)
+   ========================================================================== */
+const announcer = document.createElement('div');
+announcer.id = 'ks-announcer';
+announcer.setAttribute('aria-live', 'assertive');
+announcer.setAttribute('role', 'alert');
+// CSS to make it visually hidden but accessible
+announcer.style.cssText = 'position:absolute; width:1px; height:1px; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;';
+document.body.appendChild(announcer);
+
+function speak(text) {
+  // Clear first to ensure repeat messages are announced
+  announcer.textContent = ''; 
+  setTimeout(() => {
+      announcer.textContent = text;
+  }, 50);
 }
 
 /* ==========================================================================
@@ -63,7 +82,7 @@ function getNthChildSelector(el) {
     return `${el.tagName.toLowerCase()}:nth-child(${count})`;
 }
 
-// SELF-HEALING: Updates storage if fallback was used
+// SELF-HEALING
 function healFingerprint(foundElement, map, index) {
     const newFingerprint = generateFingerprint(foundElement);
     const oldFingerprint = map.fingerprint || {};
@@ -123,7 +142,7 @@ function getInteractiveTarget(target) {
 }
 
 /* ==========================================================================
-   3. KEYBOARD LISTENER (Trigger & Recording)
+   3. KEYBOARD LISTENER
    ========================================================================== */
 function getKeyName(e) {
   if (e.code) {
@@ -228,7 +247,7 @@ window.addEventListener("keydown", (e) => {
       
       const fp = map.fingerprint; 
       
-      // 1. Legacy fallback
+      // Legacy fallback
       if (!fp) {
          try {
              const el = document.querySelector(map.selector);
@@ -236,7 +255,7 @@ window.addEventListener("keydown", (e) => {
          } catch(e){}
       }
 
-      // 2. Robust Engine
+      // Robust Engine
       const btn = getElementByFingerprint(fp);
       if (btn) {
           btn.click();
@@ -391,6 +410,10 @@ function saveMappings(mappings) {
 }
 
 function showStatusDialog(text, duration = 0) {
+  // 1. Speak (Fix for Screen Readers)
+  speak(text);
+
+  // 2. Show Visual Dialog
   let dialog = document.getElementById('ks-status-dialog');
   if (!dialog) {
     dialog = document.createElement('div');
@@ -424,7 +447,6 @@ function hideStatusDialog() {
 // --- MESSAGING ---
 ext.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.action) return;
-  // toggle_overlay REMOVED because browser handles it now
   if (message.action === "quick_capture") performQuickCapture();
   if (message.action === "mouse_capture") performMouseCapture();
 });
