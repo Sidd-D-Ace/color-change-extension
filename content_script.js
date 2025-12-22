@@ -1,4 +1,4 @@
-/* content_script.js - KeySight: Fixed Accessibility Announcer */
+/* content_script.js - KeySight: Updated Shortcuts */
 
 const ext = (typeof browser !== "undefined") ? browser : chrome;
 
@@ -18,50 +18,39 @@ if (window.hasKeySightRun) {
 }
 
 /* ==========================================================================
-   0. ACCESSIBILITY ANNOUNCER (FIXED)
+   0. ACCESSIBILITY ANNOUNCER
    ========================================================================== */
 const announcer = document.createElement('div');
 announcer.id = 'ks-announcer';
 announcer.setAttribute('aria-live', 'assertive');
 announcer.setAttribute('role', 'alert');
-// CSS to make it visually hidden but accessible
 announcer.style.cssText = 'position:absolute; width:1px; height:1px; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;';
 document.body.appendChild(announcer);
 
 function speak(text) {
-  // Clear first to ensure repeat messages are announced
   announcer.textContent = ''; 
-  setTimeout(() => {
-      announcer.textContent = text;
-  }, 50);
+  setTimeout(() => { announcer.textContent = text; }, 50);
 }
 
 /* ==========================================================================
    1. STORAGE HANDLING
    ========================================================================== */
-function getStorageKey() {
-  return "keysight_" + window.location.hostname;
-}
+function getStorageKey() { return "keysight_" + window.location.hostname; }
 
 function refreshMappings() {
   const key = getStorageKey();
-  ext.storage.sync.get(key, (res) => {
-    storedMappings = res[key] || [];
-  });
+  ext.storage.sync.get(key, (res) => { storedMappings = res[key] || []; });
 }
 refreshMappings();
 
 ext.storage.onChanged.addListener((changes) => {
   const key = getStorageKey();
-  if (changes[key]) {
-    storedMappings = changes[key].newValue || [];
-  }
+  if (changes[key]) storedMappings = changes[key].newValue || [];
 });
 
 /* ==========================================================================
-   2. ROBUST ENGINE (Fingerprinting & Healing)
+   2. ROBUST ENGINE
    ========================================================================== */
-
 function generateFingerprint(el) {
     return {
         id: (el.id && !el.id.match(/[0-9a-f]{8}-[0-9a-f]{4}/)) ? el.id : null,
@@ -82,27 +71,22 @@ function getNthChildSelector(el) {
     return `${el.tagName.toLowerCase()}:nth-child(${count})`;
 }
 
-// SELF-HEALING
 function healFingerprint(foundElement, map, index) {
     const newFingerprint = generateFingerprint(foundElement);
     const oldFingerprint = map.fingerprint || {};
 
     if (oldFingerprint.id !== newFingerprint.id || oldFingerprint.structural !== newFingerprint.structural) {
         console.log("KeySight: Healing broken link...", map.selector);
-        
         storedMappings[index].fingerprint = newFingerprint;
         storedMappings[index].selector = newFingerprint.ariaLabel 
             ? `[aria-label="${newFingerprint.ariaLabel}"]` 
             : (newFingerprint.id ? `#${newFingerprint.id}` : newFingerprint.structural);
-
         saveMappings(storedMappings);
     }
 }
 
 function getElementByFingerprint(fp) {
     if (!fp) return null;
-
-    // 1. PRIMARY: Check ARIA Label
     if (fp.ariaLabel) {
         try {
             const el = document.querySelector(`[aria-label="${CSS.escape(fp.ariaLabel)}"]`);
@@ -113,14 +97,10 @@ function getElementByFingerprint(fp) {
             for (let el of candidates) { if(isVisible(el)) return el; }
         } catch (e) {}
     }
-
-    // 2. SECONDARY: Check ID
     if (fp.id) {
         const el = document.getElementById(fp.id);
         if (el && isVisible(el)) return el;
     }
-
-    // 3. TERTIARY: Structural
     if (fp.structural) {
         try {
             const candidates = document.querySelectorAll(fp.structural);
@@ -224,13 +204,16 @@ window.addEventListener("keydown", (e) => {
     return;
   }
 
-  // HOTKEYS
-  if (e.altKey && mainKey === "C" && !isMouseMode) {
+  // --- UPDATED HOTKEYS (Alt + Shift) ---
+  // Quick Capture: Alt + Shift + C
+  if (e.altKey && e.shiftKey && mainKey === "C" && !isMouseMode) {
     e.preventDefault(); performQuickCapture(); return;
   }
-  if (e.altKey && mainKey === "M") {
+  // Mouse Capture: Alt + Shift + M
+  if (e.altKey && e.shiftKey && mainKey === "M") {
     e.preventDefault(); performMouseCapture(); return;
   }
+  
   if (isMouseMode && e.key === "Escape") {
     disableMouseMode(); showStatusDialog("Mouse Capture Cancelled", 2000); return;
   }
@@ -247,7 +230,6 @@ window.addEventListener("keydown", (e) => {
       
       const fp = map.fingerprint; 
       
-      // Legacy fallback
       if (!fp) {
          try {
              const el = document.querySelector(map.selector);
@@ -255,7 +237,6 @@ window.addEventListener("keydown", (e) => {
          } catch(e){}
       }
 
-      // Robust Engine
       const btn = getElementByFingerprint(fp);
       if (btn) {
           btn.click();
@@ -275,14 +256,10 @@ window.addEventListener("keydown", (e) => {
 document.addEventListener("mouseover", (e) => {
   if (!isMouseMode) return;
   e.stopPropagation();
-
   const target = getInteractiveTarget(e.target);
-
   if (currentHighlightedElement === target) return;
   if (target === document.body || target === document.documentElement) return;
-
   if (currentHighlightedElement) currentHighlightedElement.style.outline = "";
-  
   target.style.outline = "4px solid #fc0303";
   currentHighlightedElement = target;
 });
@@ -295,9 +272,7 @@ document.addEventListener("mouseout", (e) => {
 document.addEventListener("click", (e) => {
   if (!isMouseMode) return;
   e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-  
   const target = getInteractiveTarget(e.target);
-  
   if(currentHighlightedElement) {
       currentHighlightedElement.style.outline = "";
       currentHighlightedElement = null;
@@ -410,10 +385,7 @@ function saveMappings(mappings) {
 }
 
 function showStatusDialog(text, duration = 0) {
-  // 1. Speak (Fix for Screen Readers)
   speak(text);
-
-  // 2. Show Visual Dialog
   let dialog = document.getElementById('ks-status-dialog');
   if (!dialog) {
     dialog = document.createElement('div');

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "KeySight",
-  "version": "1.4",
-  "description": "Navigate without sight. Map 10 custom keyboard shortcuts to click buttons and links instantly.",
+  "version": "1.5",
+  "description": "Navigate without sight. Map custom keyboard shortcuts to click buttons and links instantly.",
   "permissions": [
     "commands",
     "tabs",
@@ -19,7 +19,7 @@
     }
   ],
   "background": {
-    "scripts": ["background.js"] 
+    "scripts": ["background.js"]
   },
   "action": {
     "default_popup": "popup.html",
@@ -27,7 +27,7 @@
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "keysight@replace-this.com",
+      "id": "keysight@example.com",
       "strict_min_version": "109.0"
     }
   },
@@ -45,22 +45,22 @@
   "commands": {
     "_execute_action": {
       "suggested_key": {
-        "default": "Ctrl+Alt+E",
+        "default": "Alt+Shift+E",
         "mac": "MacCtrl+E"
       },
       "description": "Open KeySight Settings"
     },
     "quick-capture": {
       "suggested_key": {
-        "default": "Ctrl+Alt+C",
-        "mac": "MacCtrl+Alt+C"
+        "default": "Alt+Shift+C",
+        "mac": "MacCtrl+Shift+C"
       },
       "description": "Turns on Quick Capture Mode"
     },
     "mouse-capture": {
       "suggested_key": {
-        "default": "Alt+M",
-        "mac": "Alt+M"
+        "default": "Alt+Shift+M",
+        "mac": "Alt+Shift+M"
       },
       "description": "Turns on Mouse Capture Mode"
     }

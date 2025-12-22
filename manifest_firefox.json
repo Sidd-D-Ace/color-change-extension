@@ -19,7 +19,7 @@
     }
   ],
   "background": {
-    "service_worker": "background.js"
+    "scripts": ["background.js"] 
   },
   "action": {
     "default_popup": "popup.html",
@@ -45,7 +45,7 @@
   "commands": {
     "_execute_action": {
       "suggested_key": {
-        "default": "Alt+E",
+        "default": "Ctrl+Alt+E",
         "mac": "MacCtrl+E"
       },
       "description": "Open KeySight Settings"
