@@ -192,3 +192,59 @@ input.shortcut.recording { background-color: #fef2f2; border-color: var(--danger
   border-color: var(--primary);
   background-color: #fff;
 }
+/* --- NEW: ACTIONS DROPDOWN --- */
+.action-dropdown {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  background-color: #f3f4f6;
+  color: #111827;
+  cursor: pointer;
+  margin-bottom: 4px; 
+  font-family: 'Segoe UI', sans-serif;
+  font-weight: 600;
+}
+.action-dropdown:focus {
+  outline: none;
+  border-color: var(--primary);
+  background-color: #fff;
+}
+
+/* --- NOTIFICATION TOAST (Success Message) --- */
+.saved-notice {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background-color: #333;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 50px;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s;
+  pointer-events: none;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.saved-notice.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Error Message */
+#error {
+  display: none;
+  background-color: #fee2e2;
+  color: #b91c1c;
+  padding: 10px;
+  border-radius: 6px;
+  margin-top: 10px;
+  font-size: 13px;
+  text-align: center;
+  border: 1px solid #fecaca;
+}
+#error.visible { display: block; }

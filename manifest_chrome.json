@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "KeySight",
-  "version": "1.5",
-  "description": "Navigate without sight. Map custom keyboard shortcuts to click buttons and links instantly.",
+  "version": "1.4",
+  "description": "Navigate without sight. Map 10 custom keyboard shortcuts to click buttons and links instantly.",
   "permissions": [
     "commands",
     "tabs",
@@ -19,7 +19,7 @@
     }
   ],
   "background": {
-    "scripts": ["background.js"]
+    "service_worker": "background.js" 
   },
   "action": {
     "default_popup": "popup.html",
@@ -46,7 +46,7 @@
     "_execute_action": {
       "suggested_key": {
         "default": "Alt+Shift+E",
-        "mac": "MacCtrl+E"
+        "mac": "MacCtrl+Shift+E"
       },
       "description": "Open KeySight Settings"
     },
@@ -60,7 +60,7 @@
     "mouse-capture": {
       "suggested_key": {
         "default": "Alt+Shift+M",
-        "mac": "Alt+Shift+M"
+        "mac": "MacCtrl+Shift+M"
       },
       "description": "Turns on Mouse Capture Mode"
     }

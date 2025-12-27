@@ -1,26 +1,18 @@
-/* popup.js - KeySight: Internationalization (I18N) */
+/* popup.js - KeySight: Clean & Robust */
 const ext = (typeof chrome !== 'undefined') ? chrome : browser;
 
-// DOM references
-let rowsContainer, resetBtn, helpBtn, readAllBtn, error, addBtn, title, pickerBtn, langSelect;
-
+let rowsContainer, resetBtn, helpBtn, readAllBtn, error, addBtn, title, pickerBtn, langSelect, actionSelect;
 let __ct_isClicking = false;
 let isDeleting = false; 
 let currentHostname = "Global"; 
 let currentData = [];
-let currentLang = "en"; // Default
+let currentLang = "en"; 
 
-/* --------------------------------------------------------------------------
-   1. TRANSLATION DICTIONARY
-   -------------------------------------------------------------------------- */
 const TRANSLATIONS = {
   en: {
     desc: "Manage your triggers",
     btn_read: "🔊 Read All",
     btn_pick: "Pick Element on Page",
-    lbl_quick: "Quick Capture",
-    lbl_mouse: "Mouse Capture",
-    lbl_open: "Open Settings",
     col_trigger: "Trigger",
     col_shortcut: "Shortcut",
     btn_add: "+ Add New",
@@ -33,15 +25,17 @@ const TRANSLATIONS = {
     msg_deleted: "Trigger deleted",
     msg_cleared: "All settings cleared",
     msg_confirm_del: "Delete Trigger",
-    msg_confirm_clear: "Delete all settings for"
+    msg_confirm_clear: "Delete all settings for",
+    opt_actions: "Actions...",
+    opt_import: "📂 Import Config",
+    opt_export_site: "⬇️ Export This Site",
+    opt_export_all: "📦 Export All Configs",
+    msg_confirm_import: "This will overwrite existing shortcuts. Continue?"
   },
   hi: {
     desc: "अपने ट्रिगर प्रबंधित करें",
     btn_read: "🔊 सभी पढ़ें",
     btn_pick: "पेज पर एलिमेंट चुनें",
-    lbl_quick: "क्विक कैप्चर",
-    lbl_mouse: "माउस कैप्चर",
-    lbl_open: "सेटिंग्स खोलें",
     col_trigger: "ट्रिगर",
     col_shortcut: "शॉर्टकट",
     btn_add: "+ नया जोड़ें",
@@ -54,15 +48,17 @@ const TRANSLATIONS = {
     msg_deleted: "ट्रिगर हटाया गया",
     msg_cleared: "सभी सेटिंग्स हटा दी गईं",
     msg_confirm_del: "क्या आप इसे हटाना चाहते हैं",
-    msg_confirm_clear: "इस साइट की सभी सेटिंग्स हटाएं"
+    msg_confirm_clear: "इस साइट की सभी सेटिंग्स हटाएं",
+    opt_actions: "विकल्प...",
+    opt_import: "📂 इंपोर्ट सेटिंग्स",
+    opt_export_site: "⬇️ इस साइट को एक्सपोर्ट करें",
+    opt_export_all: "📦 सभी सेटिंग्स एक्सपोर्ट करें",
+    msg_confirm_import: "यह मौजूदा शॉर्टकट को बदल देगा। जारी रखें?"
   },
   mr: {
     desc: "आपले ट्रिगर्स व्यवस्थापित करा",
     btn_read: "🔊 सर्व वाचा",
     btn_pick: "घटक निवडा",
-    lbl_quick: "क्विक कॅप्चर",
-    lbl_mouse: "माउस कॅप्चर",
-    lbl_open: "सेटिंग्ज उघडा",
     col_trigger: "ट्रिगर",
     col_shortcut: "शॉर्टकट",
     btn_add: "+ नवीन जोडा",
@@ -75,15 +71,17 @@ const TRANSLATIONS = {
     msg_deleted: "ट्रिगर हटवला",
     msg_cleared: "सर्व सेटिंग्ज साफ केल्या",
     msg_confirm_del: "ट्रिगर हटवायचा का",
-    msg_confirm_clear: "या साइटवरील सर्व सेटिंग्ज हटवा"
+    msg_confirm_clear: "या साइटवरील सर्व सेटिंग्ज हटवा",
+    opt_actions: "क्रिया...",
+    opt_import: "📂 आयात करा",
+    opt_export_site: "⬇️ ही साइट निर्यात करा",
+    opt_export_all: "📦 सर्व निर्यात करा",
+    msg_confirm_import: "हे अस्तित्वात असलेले शॉर्टकट बदलेल. पुढे जायचे?"
   },
   ml: {
     desc: "ട്രിഗറുകൾ നിയന്ത്രിക്കുക",
     btn_read: "🔊 എല്ലാം വായിക്കുക",
     btn_pick: "പേജിൽ നിന്ന് തിരഞ്ഞെടുക്കുക",
-    lbl_quick: "ക്വിക്ക് ക്യാപ്‌ചർ",
-    lbl_mouse: "മൗസ് ക്യാപ്‌ചർ",
-    lbl_open: "ക്രമീകരണങ്ങൾ",
     col_trigger: "ട്രിഗർ",
     col_shortcut: "ഷോർട്ട്കട്ട്",
     btn_add: "+ പുതിയത് ചേർക്കുക",
@@ -96,20 +94,21 @@ const TRANSLATIONS = {
     msg_deleted: "നീക്കം ചെയ്തു",
     msg_cleared: "എല്ലാം മായ്ച്ചു",
     msg_confirm_del: "നീക്കം ചെയ്യണോ",
-    msg_confirm_clear: "എല്ലാ ക്രമീകരണങ്ങളും നീക്കം ചെയ്യണോ"
+    msg_confirm_clear: "എല്ലാ ക്രമീകരണങ്ങളും നീക്കം ചെയ്യണോ",
+    opt_actions: "ഓപ്ഷനുകൾ...",
+    opt_import: "📂 ഇമ്പോർട്ട് ചെയ്യുക",
+    opt_export_site: "⬇️ ഈ സൈറ്റ് എക്സ്പോർട്ട് ചെയ്യുക",
+    opt_export_all: "📦 എല്ലാം എക്സ്പോർട്ട് ചെയ്യുക",
+    msg_confirm_import: "ഇത് നിലവിലുള്ളവ മാറ്റിയെഴുതും. തുടരണോ?"
   }
 };
 
-/* --------------------------------------------------------------------------
-   2. INITIALIZATION & LISTENERS
-   -------------------------------------------------------------------------- */
 window.addEventListener('mousedown', () => { __ct_isClicking = true; }, true);
 window.addEventListener('mouseup', () => { setTimeout(() => { __ct_isClicking = false; }, 100); }, true);
 
 document.addEventListener('DOMContentLoaded', () => {
   window.speechSynthesis.cancel(); 
 
-  // Init Refs
   rowsContainer = document.getElementById('rows');
   resetBtn = document.getElementById('resetBtn');
   helpBtn = document.getElementById('helpShortcuts');
@@ -119,36 +118,52 @@ document.addEventListener('DOMContentLoaded', () => {
   title = document.getElementById('title');
   pickerBtn = document.getElementById('pickerBtn');
   langSelect = document.getElementById('langSelect');
+  actionSelect = document.getElementById('actionSelect');
 
   loadSystemShortcuts();
 
-  // Load Language Preference
   ext.storage.sync.get(['ks_lang'], (res) => {
       currentLang = res.ks_lang || 'en';
       if(langSelect) {
           langSelect.value = currentLang;
           applyLanguage(currentLang);
       }
-      // Load Data AFTER language is set so placeholders are correct
       loadMappings((mappings) => renderRows(mappings));
   });
 
-  // Language Change Listener
   if(langSelect) {
       langSelect.addEventListener('change', (e) => {
           currentLang = e.target.value;
           ext.storage.sync.set({ ks_lang: currentLang });
           applyLanguage(currentLang);
-          // Re-render rows to update placeholders inside the table
           renderRows(currentData); 
       });
   }
 
-  // ... (Rest of listeners remain the same) ...
-  const a11yStart = document.getElementById('a11y-start');
-  if (a11yStart) {
-      requestAnimationFrame(() => setTimeout(() => a11yStart.focus(), 200));
+  // --- UPDATED ACTION HANDLER (Calls Import Modal) ---
+  if (actionSelect) {
+      actionSelect.addEventListener('change', (e) => {
+          const action = e.target.value;
+          e.target.value = ""; 
+          
+          if (action === "export_site") exportCurrentSite();
+          if (action === "export_all") exportAllSettings();
+          
+          if (action === "import") {
+              if (ext.tabs && ext.tabs.query) {
+                  ext.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                      if (tabs && tabs[0]) {
+                          ext.tabs.sendMessage(tabs[0].id, { action: "open_import_modal" });
+                          window.close(); // Close popup immediately
+                      }
+                  });
+              }
+          }
+      });
   }
+
+  const a11yStart = document.getElementById('a11y-start');
+  if (a11yStart) requestAnimationFrame(() => setTimeout(() => a11yStart.focus(), 200));
 
   if (pickerBtn) {
       pickerBtn.addEventListener('click', () => {
@@ -182,7 +197,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (helpBtn) {
     helpBtn.addEventListener('click', () => {
-      // Just a simple help alert, can be localized if needed
       alert(`KeySight Help:\n\n1. "Picker" selects elements.\n2. Click Shortcut box to record.\n3. Use Alt+Shift+C for Quick Capture.`);
     });
   }
@@ -206,23 +220,65 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* --------------------------------------------------------------------------
-   3. LANGUAGE LOGIC
+   3. EXPORT LOGIC
+   -------------------------------------------------------------------------- */
+function exportCurrentSite() {
+    const dataStr = JSON.stringify(currentData, null, 2);
+    downloadFile(dataStr, `keysight_${currentHostname}.json`);
+}
+
+function exportAllSettings() {
+    ext.storage.sync.get(null, (items) => {
+        const exportData = {};
+        Object.keys(items).forEach(key => {
+            if (key.startsWith("keysight_")) {
+                exportData[key] = items[key];
+            }
+        });
+        const dataStr = JSON.stringify(exportData, null, 2);
+        downloadFile(dataStr, `keysight_backup_${new Date().toISOString().slice(0,10)}.json`);
+    });
+}
+
+function downloadFile(content, filename) {
+    const blob = new Blob([content], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+/* --------------------------------------------------------------------------
+   4. UTILS & LANGUAGE
    -------------------------------------------------------------------------- */
 function applyLanguage(lang) {
     const dict = TRANSLATIONS[lang] || TRANSLATIONS['en'];
-    
-    // Update all static text with data-i18n attribute
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
         if (dict[key]) el.textContent = dict[key];
     });
-
-    // Update Dropdown itself? (Optional, kept native names in HTML)
 }
 
-/* --------------------------------------------------------------------------
-   (KEEP EXISTING FUNCTIONS: defaultMappings, getStorageKey, performAutoSave, loadSystemShortcuts)
-   -------------------------------------------------------------------------- */
+function showStatus(msg, type = 'info') {
+  if (type === 'error') {
+    if (error) { error.textContent = msg; error.classList.add('visible'); }
+  } else { 
+    if (error) error.classList.remove('visible');
+    if (type === 'saved') {
+       const savedEl = document.querySelector('.saved-notice');
+       if (savedEl) {
+         savedEl.textContent = msg;
+         savedEl.classList.add('visible');
+         setTimeout(() => savedEl.classList.remove('visible'), 2000);
+       }
+    }
+  }
+}
+
 function defaultMappings() { return []; }
 function getStorageKey() { return "keysight_" + currentHostname; }
 
@@ -258,13 +314,9 @@ function loadSystemShortcuts() {
   });
 }
 
-/* --------------------------------------------------------------------------
-   RENDERING (Updated with Translation Placeholders)
-   -------------------------------------------------------------------------- */
 function getDisplayName(mapping) {
   if (mapping.customName) return mapping.customName;
   if (mapping.fingerprint && mapping.fingerprint.ariaLabel) return mapping.fingerprint.ariaLabel;
-  // Use translated placeholder name
   return TRANSLATIONS[currentLang].ph_name;
 }
 
@@ -364,11 +416,6 @@ function enableNameEditing(container, mapping, index) {
   input.focus();
 }
 
-// ... (Rest of functions: renderRows, addNewRow, deleteRow, collectRows, readAllShortcuts, speakText, startRecordingOn, stopRecordingOn, attachRecorders, enableShortcutInput, updateInputDisplay, saveMappings, showStatus, loadMappings, fetchStorage) ...
-// KEEP THEM EXACTLY AS THEY WERE IN PREVIOUS VERSION, they don't need changes except 'showStatus' usage inside them (which I updated above in performAutoSave).
-
-// RE-PASTING THE REST TO BE SAFE:
-
 function renderRows(mappings) {
   if (!rowsContainer) return;
   rowsContainer.innerHTML = '';
@@ -437,7 +484,6 @@ function readAllShortcuts() {
 function speakText(text) {
   window.speechSynthesis.cancel(); 
   const utterance = new SpeechSynthesisUtterance(text);
-  // Optional: Set voice language based on currentLang
   if (currentLang === 'hi') utterance.lang = 'hi-IN';
   if (currentLang === 'mr') utterance.lang = 'mr-IN';
   if (currentLang === 'ml') utterance.lang = 'ml-IN';
@@ -526,22 +572,6 @@ function saveMappings(mappings) {
       ext.storage.sync.set(payload, () => resolve(!ext.runtime.lastError));
     } catch(e) { resolve(false); }
   });
-}
-
-function showStatus(msg, type = 'info') {
-  if (type === 'error') {
-    if (error) { error.textContent = msg; error.classList.add('visible'); }
-  } else { 
-    if (error) error.classList.remove('visible');
-    if (type === 'saved') {
-       const savedEl = document.querySelector('.saved-notice');
-       if (savedEl) {
-         savedEl.textContent = msg || "Saved"; // Use Msg if passed
-         savedEl.classList.add('visible');
-         setTimeout(() => savedEl.classList.remove('visible'), 1500);
-       }
-    }
-  }
 }
 
 function loadMappings(cb) {

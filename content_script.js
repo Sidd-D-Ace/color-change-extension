@@ -1,4 +1,4 @@
-/* content_script.js - KeySight: Pro UI + Multi-Language */
+/* content_script.js - KeySight: Gmail Fix & Robust Events */
 
 const ext = (typeof browser !== "undefined") ? browser : chrome;
 
@@ -11,9 +11,9 @@ let storedMappings = [];
 let quickCaptureParts = [];
 let bannerEl = null;
 let removeHoverHighlight = null;
-let currentLang = "en"; // Default Language
+let currentLang = "en"; 
 
-// --- TRANSLATION DICTIONARY (Content Script Specific) ---
+// --- TRANSLATION DICTIONARY ---
 const TRANSLATIONS = {
   en: {
     mouse_on: "Mouse Capture ON • Click an element",
@@ -73,7 +73,6 @@ const TRANSLATIONS = {
   }
 };
 
-// Helper to get text
 function t(key) {
     const dict = TRANSLATIONS[currentLang] || TRANSLATIONS['en'];
     return dict[key] || key;
@@ -89,7 +88,6 @@ if (window.hasKeySightRun) {
 /* ==========================================================================
    0. VISUALS: BANNER & HIGHLIGHT
    ========================================================================== */
-
 function createBanner() {
     const b = document.createElement('div');
     b.setAttribute('role', 'alert');
@@ -116,24 +114,23 @@ function setBannerState(type, textOverride = "") {
         return;
     }
 
-    // Show Banner
     bannerEl.style.transform = "translateX(-50%) translateY(0)";
 
     if (type === 'MOUSE') {
-        bannerEl.style.backgroundColor = "#2980b9"; // Blue
+        bannerEl.style.backgroundColor = "#2980b9"; 
         bannerEl.innerHTML = `<span>🖱️</span><span>${t('mouse_on')}</span>`;
     } else if (type === 'QUICK') {
-        bannerEl.style.backgroundColor = "#d93025"; // Red
+        bannerEl.style.backgroundColor = "#d93025"; 
         bannerEl.innerHTML = `<span>🔴</span><span>${t('quick_on')}</span>`;
     } else if (type === 'RECORDING') {
-        bannerEl.style.backgroundColor = "#f39c12"; // Orange
+        bannerEl.style.backgroundColor = "#f39c12"; 
         bannerEl.innerHTML = `<span>⌨️</span><span>${t('recording')}</span>`;
     } else if (type === 'SUCCESS') {
-        bannerEl.style.backgroundColor = "#27ae60"; // Green
+        bannerEl.style.backgroundColor = "#27ae60"; 
         bannerEl.innerHTML = `<span>✅</span><span>${textOverride || t('saved')}</span>`;
         setTimeout(() => setBannerState('OFF'), 2000);
     } else if (type === 'ERROR') {
-        bannerEl.style.backgroundColor = "#c0392b"; // Dark Red
+        bannerEl.style.backgroundColor = "#c0392b"; 
         bannerEl.innerHTML = `<span>⚠️</span><span>${textOverride || t('error')}</span>`;
         setTimeout(() => setBannerState('OFF'), 3000);
     }
@@ -163,9 +160,6 @@ function highlight(el, color, duration = 0) {
     }
 }
 
-/* ==========================================================================
-   1. ACCESSIBILITY ANNOUNCER
-   ========================================================================== */
 const announcer = document.createElement('div');
 announcer.id = 'ks-announcer';
 announcer.setAttribute('aria-live', 'assertive');
@@ -179,16 +173,15 @@ function speak(text) {
 }
 
 /* ==========================================================================
-   2. STORAGE HANDLING (UPDATED FOR LANGUAGE)
+   1. STORAGE HANDLING
    ========================================================================== */
 function getStorageKey() { return "keysight_" + window.location.hostname; }
 
 function refreshMappings() {
   const key = getStorageKey();
-  // Fetch both mappings AND Language preference
   ext.storage.sync.get([key, 'ks_lang'], (res) => { 
       storedMappings = res[key] || []; 
-      currentLang = res.ks_lang || 'en'; // Set Global Language
+      currentLang = res.ks_lang || 'en'; 
   });
 }
 refreshMappings();
@@ -196,15 +189,11 @@ refreshMappings();
 ext.storage.onChanged.addListener((changes) => {
   const key = getStorageKey();
   if (changes[key]) storedMappings = changes[key].newValue || [];
-  
-  // Watch for language changes from Popup
-  if (changes.ks_lang) {
-      currentLang = changes.ks_lang.newValue || 'en';
-  }
+  if (changes.ks_lang) currentLang = changes.ks_lang.newValue || 'en';
 });
 
 /* ==========================================================================
-   3. ROBUST ENGINE (Full Path Generator)
+   2. ROBUST ENGINE
    ========================================================================== */
 function generateFullPath(el) {
     if (!el) return "";
@@ -282,7 +271,7 @@ function getInteractiveTarget(target) {
 }
 
 /* ==========================================================================
-   4. KEYBOARD LISTENER
+   3. KEYBOARD LISTENER
    ========================================================================== */
 function getKeyName(e) {
   if (e.code) {
@@ -294,9 +283,10 @@ function getKeyName(e) {
   return e.key ? e.key.toUpperCase() : "";
 }
 
-// Global KeyUp Listener (For Recording)
+// FIX: Added 'true' (UseCapture) to KeyUp to catch Gmail events
 window.addEventListener('keyup', (e) => {
   if (isRecordingState && quickCaptureParts.length > 0) {
+    e.stopPropagation(); // Stop Gmail from grabbing focus back
     isRecordingState = false;
     const currentCombo = quickCaptureParts.join("+").toLowerCase();
 
@@ -317,16 +307,15 @@ window.addEventListener('keyup', (e) => {
     if (isMouseMode) disableMouseMode();
 
     setBannerState('SUCCESS', `${t('saved')}: ${currentCombo}`);
-    speak(`${t('saved')} ${currentCombo}`);
+    // speak(`${t('saved')} ${currentCombo}`);
     return;
   }
-});
+}, true); // <--- CAPTURE PHASE FOR GMAIL FIX
 
-// Global KeyDown Listener
 window.addEventListener("keydown", (e) => {
   const tag = (e.target.tagName || "");
   
-  // Shortcuts
+  // Internal Shortcuts
   if (e.altKey && e.shiftKey && (e.key === 'c' || e.key === 'C')) {
      e.preventDefault(); performQuickCapture(); return;
   }
@@ -336,13 +325,18 @@ window.addEventListener("keydown", (e) => {
   if (isMouseMode && e.key === "Escape") {
     disableMouseMode(); 
     setBannerState('OFF');
-    speak(t('mouse_cancel')); 
+    // speak(t('mouse_cancel')); 
     return;
   }
   if (isMouseMode) return; 
 
-  // Recording & Trigger
-  if (!isRecordingState && (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || e.target.isContentEditable)) return;
+  // --- GMAIL FIX: SMART INPUT GUARD ---
+  // Allow shortcuts inside Input/Textarea ONLY if using Modifier Keys (Alt/Ctrl)
+  const isTypingField = (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || e.target.isContentEditable);
+  const isModifierPressed = e.ctrlKey || e.altKey || e.metaKey;
+  
+  if (!isRecordingState && isTypingField && !isModifierPressed) return;
+  // ------------------------------------
 
   const mainKey = getKeyName(e);
   if (!mainKey) return;
@@ -358,7 +352,6 @@ window.addEventListener("keydown", (e) => {
   }
   const combo = parts.join("+");
 
-  // RECORDING
   if (isRecordingState) {
     e.preventDefault(); e.stopPropagation();
     for (let i = 0; i < storedMappings.length; i++) {
@@ -368,7 +361,7 @@ window.addEventListener("keydown", (e) => {
 
       if (combo.toLowerCase() === map.shortcut.toLowerCase()) {
         setBannerState('ERROR', t('exists'));
-        speak(t('exists'));
+        // speak(t('exists'));
         quickCaptureParts = [];
         return;
       }
@@ -406,14 +399,14 @@ window.addEventListener("keydown", (e) => {
       }
       
       setBannerState('ERROR', t('el_not_found'));
-      speak(t('el_not_found'));
+      // speak(t('el_not_found'));
       return;
     }
   }
 }, true);
 
 /* ==========================================================================
-   5. CAPTURE MODES
+   4. CAPTURE MODES
    ========================================================================== */
 document.addEventListener("mouseover", (e) => {
   if (!isMouseMode) return;
@@ -450,7 +443,7 @@ function performMouseCapture() {
   isMouseMode = true;
   document.body.style.cursor = 'crosshair';
   setBannerState('MOUSE'); 
-  speak(t('mouse_on'));
+  // speak(t('mouse_on'));
 }
 
 function disableMouseMode() {
@@ -466,7 +459,7 @@ async function performQuickCapture() {
   const target = document.activeElement;
   if (!target || target === document.body) {
     setBannerState('ERROR', t('no_el'));
-    speak(t('tab_hint'));
+    // speak(t('tab_hint'));
     return;
   }
   
@@ -474,14 +467,14 @@ async function performQuickCapture() {
   capturedElement = target; 
   
   setBannerState('QUICK'); 
-  speak(t('quick_on'));
+  // speak(t('quick_on'));
   
   await delay(500);
   await captureHandler(target);
 }
 
 /* ==========================================================================
-   6. SAVING LOGIC
+   5. SAVING LOGIC
    ========================================================================== */
 async function captureHandler(target) {
   if (!target) return;
@@ -493,9 +486,9 @@ async function captureHandler(target) {
   const fingerprint = generateFingerprint(target);
   const fullPathSelector = generateFullPath(target);
 
-  if (await quickCaptureCheck(fingerprint)) {
+  if (await quickCaptureCheck(fingerprint, fullPathSelector)) {
     setBannerState('ERROR', t('trigger_exists'));
-    speak(t('trigger_exists'));
+    // speak(t('trigger_exists'));
     if (removeHoverHighlight) removeHoverHighlight();
     return;
   }
@@ -524,15 +517,17 @@ async function saveNewTrigger(triggerObj) {
   
   isRecordingState = true; 
   setBannerState('RECORDING'); 
-  speak(t('press_keys'));
+  // speak(t('press_keys'));
 }
 
-// --- UTILS ---
-async function quickCaptureCheck(fp) {
+async function quickCaptureCheck(fp, selector) {
   return storedMappings.some(m => {
-    if (!m.fingerprint) return false;
-    if (fp.id && m.fingerprint.id === fp.id) return true;
-    if (fp.ariaLabel && m.fingerprint.ariaLabel === fp.ariaLabel) return true;
+    if (!m) return false;
+    if (m.selector === selector) return true;
+    if (m.fingerprint) {
+        if (fp.id && m.fingerprint.id === fp.id) return true;
+        if (fp.ariaLabel && m.fingerprint.ariaLabel === fp.ariaLabel) return true;
+    }
     return false;
   });
 }
@@ -552,9 +547,128 @@ function saveMappings(mappings) {
   });
 }
 
-// --- MESSAGING ---
+/* ==========================================================================
+   6. IMPORT MODAL
+   ========================================================================== */
 ext.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.action) return;
   if (message.action === "quick_capture") performQuickCapture();
   if (message.action === "mouse_capture") performMouseCapture();
+  if (message.action === "open_import_modal") createImportModal();
 });
+
+function createImportModal() {
+    if (document.getElementById('ks-import-overlay')) return;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'ks-import-overlay';
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(30, 41, 59, 0.75); z-index: 2147483647;
+        display: flex; align-items: center; justify-content: center;
+        backdrop-filter: blur(4px); font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    `;
+
+    const card = document.createElement('div');
+    card.style.cssText = `
+        background: #ffffff; width: 420px; padding: 32px; border-radius: 16px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); text-align: center;
+        position: relative; animation: ksPopIn 0.2s ease-out; color: #1e293b;
+    `;
+
+    card.innerHTML = `
+        <style>
+            @keyframes ksPopIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+            .ks-title { margin: 0 0 12px; color: #0f172a; font-size: 22px; font-weight: 700; letter-spacing: -0.025em; }
+            .ks-sub { color: #64748b; margin-bottom: 24px; font-size: 15px; line-height: 1.5; }
+            .ks-upload-box {
+                display: flex; flex-direction: column; align-items: center; justify-content: center;
+                border: 2px dashed #cbd5e1; border-radius: 12px; padding: 32px 24px;
+                cursor: pointer; transition: all 0.2s ease; background: #f8fafc; gap: 12px;
+            }
+            .ks-upload-box:hover { border-color: #3b82f6; background: #eff6ff; }
+            .ks-icon { font-size: 36px; color: #3b82f6; }
+            .ks-text { font-weight: 600; color: #334155; font-size: 16px; }
+            .ks-close {
+                position: absolute; top: 16px; right: 16px; background: none; border: none;
+                font-size: 20px; cursor: pointer; color: #94a3b8; transition: color 0.2s; padding: 4px; line-height: 1;
+            }
+            .ks-close:hover { color: #ef4444; }
+            #ks-status-msg { margin-top: 20px; font-size: 14px; font-weight: 600; min-height: 20px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+            .ks-success { color: #16a34a; }
+            .ks-error { color: #dc2626; }
+        </style>
+        <button class="ks-close" id="ks-close-btn" aria-label="Close">✕</button>
+        <h2 class="ks-title">Import Configuration</h2>
+        <p class="ks-sub">Import settings for <b>${window.location.hostname}</b> or a full backup.</p>
+        
+        <label class="ks-upload-box">
+            <div class="ks-icon">📂</div>
+            <div class="ks-text">Click to Select JSON File</div>
+            <input type="file" id="ks-file-input" accept=".json" style="display: none;">
+        </label>
+        
+        <div id="ks-status-msg"></div>
+    `;
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    const closeBtn = card.querySelector('#ks-close-btn');
+    const fileInput = card.querySelector('#ks-file-input');
+    const statusMsg = card.querySelector('#ks-status-msg');
+
+    const closeModal = () => {
+        overlay.style.opacity = '0';
+        overlay.style.transition = 'opacity 0.2s ease';
+        setTimeout(() => overlay.remove(), 200);
+    };
+
+    closeBtn.onclick = closeModal;
+    overlay.onclick = (e) => {
+        if (e.target === overlay) closeModal();
+    };
+
+    fileInput.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        statusMsg.textContent = "Reading file...";
+        statusMsg.className = "";
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const json = JSON.parse(evt.target.result);
+
+                if (Array.isArray(json)) {
+                    storedMappings = json;
+                    const key = getStorageKey();
+                    const payload = {};
+                    payload[key] = json;
+
+                    ext.storage.sync.set(payload, () => {
+                        statusMsg.innerHTML = "✅ Success! Applied to this page.";
+                        statusMsg.className = "ks-success";
+                        setTimeout(closeModal, 1500);
+                    });
+                } else if (typeof json === 'object') {
+                    ext.storage.sync.set(json, () => {
+                        refreshMappings();
+                        statusMsg.innerHTML = "✅ Full Backup Restored!";
+                        statusMsg.className = "ks-success";
+                        setTimeout(closeModal, 1500);
+                    });
+                } else {
+                    statusMsg.innerHTML = "❌ Invalid JSON Format";
+                    statusMsg.className = "ks-error";
+                }
+            } catch (err) {
+                console.error(err);
+                statusMsg.innerHTML = "❌ Error: Corrupt File";
+                statusMsg.className = "ks-error";
+            }
+        };
+        reader.readAsText(file);
+    };
+}
