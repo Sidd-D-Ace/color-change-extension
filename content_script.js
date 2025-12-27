@@ -1,4 +1,4 @@
-/* content_script.js - KeySight: Updated Shortcuts */
+/* content_script.js - KeySight: Pro UI + Multi-Language */
 
 const ext = (typeof browser !== "undefined") ? browser : chrome;
 
@@ -9,6 +9,75 @@ let currentHighlightedElement = null;
 let isMouseMode = false;
 let storedMappings = [];
 let quickCaptureParts = [];
+let bannerEl = null;
+let removeHoverHighlight = null;
+let currentLang = "en"; // Default Language
+
+// --- TRANSLATION DICTIONARY (Content Script Specific) ---
+const TRANSLATIONS = {
+  en: {
+    mouse_on: "Mouse Capture ON • Click an element",
+    quick_on: "Quick Capture ON • Tab to button",
+    recording: "Recording • Press Shortcut Keys Now...",
+    saved: "Saved",
+    error: "Error",
+    exists: "Shortcut Exists!",
+    el_not_found: "Element not found",
+    trigger_exists: "Trigger Exists",
+    no_el: "No element selected",
+    mouse_cancel: "Mouse Capture Cancelled",
+    tab_hint: "Tab to a button first",
+    press_keys: "Press shortcut keys"
+  },
+  hi: {
+    mouse_on: "माउस कैप्चर चालू • तत्व पर क्लिक करें",
+    quick_on: "क्विक कैप्चर चालू • बटन पर टैब करें",
+    recording: "रिकॉर्डिंग • अब शॉर्टकट बटन दबाएं...",
+    saved: "सुरक्षित किया गया",
+    error: "त्रुटि",
+    exists: "शॉर्टकट पहले से मौजूद है!",
+    el_not_found: "तत्व नहीं मिला",
+    trigger_exists: "ट्रिगर पहले से मौजूद है",
+    no_el: "कोई तत्व नहीं चुना गया",
+    mouse_cancel: "माउस कैप्चर रद्द कर दिया गया",
+    tab_hint: "पहले बटन पर टैब करें",
+    press_keys: "शॉर्टकट बटन दबाएं"
+  },
+  mr: {
+    mouse_on: "माउस कॅप्चर चालू • घटकावर क्लिक करा",
+    quick_on: "क्विक कॅप्चर चालू • बटणावर टॅब करा",
+    recording: "रेकॉर्डिंग • आता शॉर्टकट की दाबा...",
+    saved: "जतन केले",
+    error: "त्रुटी",
+    exists: "शॉर्टकट आधीच अस्तित्वात आहे!",
+    el_not_found: "घटक सापडला नाही",
+    trigger_exists: "ट्रिगर आधीच अस्तित्वात आहे",
+    no_el: "कोणताही घटक निवडलेला नाही",
+    mouse_cancel: "माउस कॅप्चर रद्द केले",
+    tab_hint: "प्रथम बटणावर टॅब करा",
+    press_keys: "शॉर्टकट की दाबा"
+  },
+  ml: {
+    mouse_on: "മൗസ് ക്യാപ്‌ചർ ഓൺ • എലമെന്റിൽ ക്ലിക്ക് ചെയ്യുക",
+    quick_on: "ക്വിക്ക് ക്യാപ്‌ചർ ഓൺ • ബട്ടണിലേക്ക് ടാബ് ചെയ്യുക",
+    recording: "റെക്കോർഡിംഗ് • ഷോർട്ട്കട്ട് കീകൾ അമർത്തുക...",
+    saved: "സേവ് ചെയ്തു",
+    error: "പിശക്",
+    exists: "ഷോർട്ട്കട്ട് നിലവിലുണ്ട്!",
+    el_not_found: "എലമെന്റ് കണ്ടെത്തിയില്ല",
+    trigger_exists: "ട്രിഗർ നിലവിലുണ്ട്",
+    no_el: "എലമെന്റ് തിരഞ്ഞെടുത്തിട്ടില്ല",
+    mouse_cancel: "മൗസ് ക്യാപ്‌ചർ റദ്ദാക്കി",
+    tab_hint: "ആദ്യം ബട്ടണിലേക്ക് ടാബ് ചെയ്യുക",
+    press_keys: "ഷോർട്ട്കട്ട് കീകൾ അമർത്തുക"
+  }
+};
+
+// Helper to get text
+function t(key) {
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS['en'];
+    return dict[key] || key;
+}
 
 // --- GUARD ---
 if (window.hasKeySightRun) {
@@ -18,7 +87,84 @@ if (window.hasKeySightRun) {
 }
 
 /* ==========================================================================
-   0. ACCESSIBILITY ANNOUNCER
+   0. VISUALS: BANNER & HIGHLIGHT
+   ========================================================================== */
+
+function createBanner() {
+    const b = document.createElement('div');
+    b.setAttribute('role', 'alert');
+    b.style.cssText = `
+        position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-200%);
+        padding: 12px 24px; border-radius: 50px; 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        background: #333; color: white;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-weight: 600; font-size: 15px; letter-spacing: 0.5px;
+        z-index: 2147483647; display: flex; align-items: center; gap: 10px;
+        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        pointer-events: none;
+    `;
+    document.body.appendChild(b);
+    return b;
+}
+
+function setBannerState(type, textOverride = "") {
+    if (!bannerEl) bannerEl = createBanner();
+    
+    if (type === 'OFF') {
+        bannerEl.style.transform = "translateX(-50%) translateY(-200%)";
+        return;
+    }
+
+    // Show Banner
+    bannerEl.style.transform = "translateX(-50%) translateY(0)";
+
+    if (type === 'MOUSE') {
+        bannerEl.style.backgroundColor = "#2980b9"; // Blue
+        bannerEl.innerHTML = `<span>🖱️</span><span>${t('mouse_on')}</span>`;
+    } else if (type === 'QUICK') {
+        bannerEl.style.backgroundColor = "#d93025"; // Red
+        bannerEl.innerHTML = `<span>🔴</span><span>${t('quick_on')}</span>`;
+    } else if (type === 'RECORDING') {
+        bannerEl.style.backgroundColor = "#f39c12"; // Orange
+        bannerEl.innerHTML = `<span>⌨️</span><span>${t('recording')}</span>`;
+    } else if (type === 'SUCCESS') {
+        bannerEl.style.backgroundColor = "#27ae60"; // Green
+        bannerEl.innerHTML = `<span>✅</span><span>${textOverride || t('saved')}</span>`;
+        setTimeout(() => setBannerState('OFF'), 2000);
+    } else if (type === 'ERROR') {
+        bannerEl.style.backgroundColor = "#c0392b"; // Dark Red
+        bannerEl.innerHTML = `<span>⚠️</span><span>${textOverride || t('error')}</span>`;
+        setTimeout(() => setBannerState('OFF'), 3000);
+    }
+}
+
+function highlight(el, color, duration = 0) {
+    if (!el) return null;
+    const originalOutline = el.style.outline;
+    const originalBoxShadow = el.style.boxShadow;
+    const originalTransition = el.style.transition;
+
+    el.style.setProperty('outline', `4px solid ${color}`, 'important');
+    el.style.setProperty('box-shadow', `0 0 0 4px ${color}, 0 0 15px ${color}`, 'important');
+    el.style.setProperty('transition', 'none', 'important');
+
+    const clear = () => {
+        el.style.outline = originalOutline;
+        el.style.boxShadow = originalBoxShadow;
+        el.style.transition = originalTransition;
+    };
+
+    if (duration > 0) {
+        setTimeout(clear, duration);
+        return null;
+    } else {
+        return clear;
+    }
+}
+
+/* ==========================================================================
+   1. ACCESSIBILITY ANNOUNCER
    ========================================================================== */
 const announcer = document.createElement('div');
 announcer.id = 'ks-announcer';
@@ -28,29 +174,60 @@ announcer.style.cssText = 'position:absolute; width:1px; height:1px; margin:-1px
 document.body.appendChild(announcer);
 
 function speak(text) {
-  announcer.textContent = ''; 
-  setTimeout(() => { announcer.textContent = text; }, 50);
+    announcer.textContent = ''; 
+    setTimeout(() => { announcer.textContent = text; }, 50);
 }
 
 /* ==========================================================================
-   1. STORAGE HANDLING
+   2. STORAGE HANDLING (UPDATED FOR LANGUAGE)
    ========================================================================== */
 function getStorageKey() { return "keysight_" + window.location.hostname; }
 
 function refreshMappings() {
   const key = getStorageKey();
-  ext.storage.sync.get(key, (res) => { storedMappings = res[key] || []; });
+  // Fetch both mappings AND Language preference
+  ext.storage.sync.get([key, 'ks_lang'], (res) => { 
+      storedMappings = res[key] || []; 
+      currentLang = res.ks_lang || 'en'; // Set Global Language
+  });
 }
 refreshMappings();
 
 ext.storage.onChanged.addListener((changes) => {
   const key = getStorageKey();
   if (changes[key]) storedMappings = changes[key].newValue || [];
+  
+  // Watch for language changes from Popup
+  if (changes.ks_lang) {
+      currentLang = changes.ks_lang.newValue || 'en';
+  }
 });
 
 /* ==========================================================================
-   2. ROBUST ENGINE
+   3. ROBUST ENGINE (Full Path Generator)
    ========================================================================== */
+function generateFullPath(el) {
+    if (!el) return "";
+    const path = [];
+    while (el && el.nodeType === Node.ELEMENT_NODE) {
+        let selector = el.nodeName.toLowerCase();
+        if (el.id && !el.id.match(/[0-9a-f]{8}-[0-9a-f]{4}/) && !/\d/.test(el.id)) {
+            selector += '#' + el.id;
+            path.unshift(selector);
+            break; 
+        } else {
+            let sib = el, nth = 1;
+            while (sib = sib.previousElementSibling) {
+                if (sib.nodeName.toLowerCase() === selector) nth++;
+            }
+            if (nth > 1) selector += ":nth-of-type("+nth+")";
+        }
+        path.unshift(selector);
+        el = el.parentNode;
+    }
+    return path.join(" > ");
+}
+
 function generateFingerprint(el) {
     return {
         id: (el.id && !el.id.match(/[0-9a-f]{8}-[0-9a-f]{4}/)) ? el.id : null,
@@ -58,17 +235,9 @@ function generateFingerprint(el) {
                    (el.parentElement ? el.parentElement.getAttribute('aria-label') : null) || 
                    el.innerText?.substring(0, 30).trim(), 
         className: (typeof el.className === 'string') ? el.className.trim() : null,
-        structural: getNthChildSelector(el),
+        structural: generateFullPath(el),
         tagName: el.tagName.toLowerCase()
     };
-}
-
-function getNthChildSelector(el) {
-    if (!el || !el.parentNode) return null;
-    let count = 1;
-    let sib = el;
-    while ((sib = sib.previousElementSibling)) count++;
-    return `${el.tagName.toLowerCase()}:nth-child(${count})`;
 }
 
 function healFingerprint(foundElement, map, index) {
@@ -78,37 +247,28 @@ function healFingerprint(foundElement, map, index) {
     if (oldFingerprint.id !== newFingerprint.id || oldFingerprint.structural !== newFingerprint.structural) {
         console.log("KeySight: Healing broken link...", map.selector);
         storedMappings[index].fingerprint = newFingerprint;
-        storedMappings[index].selector = newFingerprint.ariaLabel 
-            ? `[aria-label="${newFingerprint.ariaLabel}"]` 
-            : (newFingerprint.id ? `#${newFingerprint.id}` : newFingerprint.structural);
+        storedMappings[index].selector = generateFullPath(foundElement);
         saveMappings(storedMappings);
     }
 }
 
 function getElementByFingerprint(fp) {
     if (!fp) return null;
+    if (fp.structural) {
+        try {
+            const el = document.querySelector(fp.structural);
+            if (el && isVisible(el)) return el;
+        } catch(e) {}
+    }
     if (fp.ariaLabel) {
         try {
             const el = document.querySelector(`[aria-label="${CSS.escape(fp.ariaLabel)}"]`);
             if (el && isVisible(el)) return el;
         } catch(e) {}
-        try {
-            const candidates = document.querySelectorAll(`[aria-label*="${CSS.escape(fp.ariaLabel)}"]`);
-            for (let el of candidates) { if(isVisible(el)) return el; }
-        } catch (e) {}
     }
     if (fp.id) {
         const el = document.getElementById(fp.id);
         if (el && isVisible(el)) return el;
-    }
-    if (fp.structural) {
-        try {
-            const candidates = document.querySelectorAll(fp.structural);
-            for(let el of candidates) {
-                if (fp.className && !el.classList.contains(fp.className.split(' ')[0])) continue;
-                if (isVisible(el)) return el;
-            }
-        } catch (e) {}
     }
     return null;
 }
@@ -122,7 +282,7 @@ function getInteractiveTarget(target) {
 }
 
 /* ==========================================================================
-   3. KEYBOARD LISTENER
+   4. KEYBOARD LISTENER
    ========================================================================== */
 function getKeyName(e) {
   if (e.code) {
@@ -134,6 +294,7 @@ function getKeyName(e) {
   return e.key ? e.key.toUpperCase() : "";
 }
 
+// Global KeyUp Listener (For Recording)
 window.addEventListener('keyup', (e) => {
   if (isRecordingState && quickCaptureParts.length > 0) {
     isRecordingState = false;
@@ -149,27 +310,38 @@ window.addEventListener('keyup', (e) => {
 
     quickCaptureParts = [];
     if (capturedElement) {
-      capturedElement.style.border = "";
-      capturedElement.style.outline = "";
+      if (removeHoverHighlight) removeHoverHighlight();
+      removeHoverHighlight = null;
       capturedElement = null;
     }
     if (isMouseMode) disableMouseMode();
 
-    showStatusDialog(`Saved: ${currentCombo}`, 2000);
+    setBannerState('SUCCESS', `${t('saved')}: ${currentCombo}`);
+    speak(`${t('saved')} ${currentCombo}`);
     return;
-  }
-  
-  if (storedMappings.length > 0) {
-    const lastItem = storedMappings[storedMappings.length - 1];
-    if (!isRecordingState && lastItem && lastItem.shortcut === '' && lastItem.entryType === 'quick-capture') {
-      isRecordingState = true;
-      showStatusDialog("Press keys to record shortcut...", 0); 
-    }
   }
 });
 
+// Global KeyDown Listener
 window.addEventListener("keydown", (e) => {
   const tag = (e.target.tagName || "");
+  
+  // Shortcuts
+  if (e.altKey && e.shiftKey && (e.key === 'c' || e.key === 'C')) {
+     e.preventDefault(); performQuickCapture(); return;
+  }
+  if (e.altKey && e.shiftKey && (e.key === 'm' || e.key === 'M')) {
+     e.preventDefault(); performMouseCapture(); return;
+  }
+  if (isMouseMode && e.key === "Escape") {
+    disableMouseMode(); 
+    setBannerState('OFF');
+    speak(t('mouse_cancel')); 
+    return;
+  }
+  if (isMouseMode) return; 
+
+  // Recording & Trigger
   if (!isRecordingState && (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || e.target.isContentEditable)) return;
 
   const mainKey = getKeyName(e);
@@ -186,7 +358,7 @@ window.addEventListener("keydown", (e) => {
   }
   const combo = parts.join("+");
 
-  // RECORDING LOGIC
+  // RECORDING
   if (isRecordingState) {
     e.preventDefault(); e.stopPropagation();
     for (let i = 0; i < storedMappings.length; i++) {
@@ -195,7 +367,8 @@ window.addEventListener("keydown", (e) => {
       if (i === storedMappings.length - 1 && map.entryType === 'quick-capture') continue;
 
       if (combo.toLowerCase() === map.shortcut.toLowerCase()) {
-        showStatusDialog("Shortcut Already Exists! Try Again.", 2000);
+        setBannerState('ERROR', t('exists'));
+        speak(t('exists'));
         quickCaptureParts = [];
         return;
       }
@@ -204,22 +377,7 @@ window.addEventListener("keydown", (e) => {
     return;
   }
 
-  // --- UPDATED HOTKEYS (Alt + Shift) ---
-  // Quick Capture: Alt + Shift + C
-  if (e.altKey && e.shiftKey && mainKey === "C" && !isMouseMode) {
-    e.preventDefault(); performQuickCapture(); return;
-  }
-  // Mouse Capture: Alt + Shift + M
-  if (e.altKey && e.shiftKey && mainKey === "M") {
-    e.preventDefault(); performMouseCapture(); return;
-  }
-  
-  if (isMouseMode && e.key === "Escape") {
-    disableMouseMode(); showStatusDialog("Mouse Capture Cancelled", 2000); return;
-  }
-  if (isMouseMode) return; 
-
-  // TRIGGER LOGIC
+  // TRIGGER
   const currentComboLower = combo.toLowerCase();
   for (let i = 0; i < storedMappings.length; i++) {
     const map = storedMappings[i];
@@ -230,28 +388,32 @@ window.addEventListener("keydown", (e) => {
       
       const fp = map.fingerprint; 
       
-      if (!fp) {
-         try {
-             const el = document.querySelector(map.selector);
-             if (el) { el.click(); return; }
-         } catch(e){}
-      }
+      try {
+           const el = document.querySelector(map.selector);
+           if (el && isVisible(el)) { 
+               highlight(el, '#2ecc71', 400); 
+               el.click(); 
+               return; 
+           }
+      } catch(e){}
 
       const btn = getElementByFingerprint(fp);
       if (btn) {
+          highlight(btn, '#2ecc71', 400); 
           btn.click();
           healFingerprint(btn, map, i); 
           return;
       }
       
-      showStatusDialog("Element not found.", 2000);
+      setBannerState('ERROR', t('el_not_found'));
+      speak(t('el_not_found'));
       return;
     }
   }
 }, true);
 
 /* ==========================================================================
-   4. CAPTURE MODES
+   5. CAPTURE MODES
    ========================================================================== */
 document.addEventListener("mouseover", (e) => {
   if (!isMouseMode) return;
@@ -259,24 +421,25 @@ document.addEventListener("mouseover", (e) => {
   const target = getInteractiveTarget(e.target);
   if (currentHighlightedElement === target) return;
   if (target === document.body || target === document.documentElement) return;
-  if (currentHighlightedElement) currentHighlightedElement.style.outline = "";
-  target.style.outline = "4px solid #fc0303";
+  
+  if (removeHoverHighlight) removeHoverHighlight();
+
   currentHighlightedElement = target;
+  removeHoverHighlight = highlight(target, '#3498db');
 });
 
 document.addEventListener("mouseout", (e) => {
   if (!isMouseMode) return;
-  if (currentHighlightedElement) currentHighlightedElement.style.outline = "";
 });
 
 document.addEventListener("click", (e) => {
   if (!isMouseMode) return;
   e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
   const target = getInteractiveTarget(e.target);
-  if(currentHighlightedElement) {
-      currentHighlightedElement.style.outline = "";
-      currentHighlightedElement = null;
-  }
+  
+  if (removeHoverHighlight) removeHoverHighlight();
+  
+  disableMouseMode();
   captureHandler(target);
 }, true);
 
@@ -286,55 +449,59 @@ function performMouseCapture() {
   if (isMouseMode) { disableMouseMode(); return; }
   isMouseMode = true;
   document.body.style.cursor = 'crosshair';
-  showStatusDialog("Mouse Capture ON. Click an element.", 0);
+  setBannerState('MOUSE'); 
+  speak(t('mouse_on'));
 }
 
 function disableMouseMode() {
   isMouseMode = false;
   document.body.style.cursor = 'auto';
-  if (currentHighlightedElement) {
-    currentHighlightedElement.style.outline = '';
-    currentHighlightedElement = null;
-  }
-  hideStatusDialog();
+  if (removeHoverHighlight) removeHoverHighlight();
+  removeHoverHighlight = null;
+  currentHighlightedElement = null;
+  setBannerState('OFF');
 }
 
 async function performQuickCapture() {
   const target = document.activeElement;
   if (!target || target === document.body) {
-    showStatusDialog("No element selected. Tab to a button first.", 3000);
+    setBannerState('ERROR', t('no_el'));
+    speak(t('tab_hint'));
     return;
   }
-  target.style.border = "thick solid #fc0303";
+  
+  removeHoverHighlight = highlight(target, '#f39c12'); 
   capturedElement = target; 
-  showStatusDialog("Quick Capture ON: Analyzing...", 0);
+  
+  setBannerState('QUICK'); 
+  speak(t('quick_on'));
+  
   await delay(500);
   await captureHandler(target);
 }
 
 /* ==========================================================================
-   5. SAVING LOGIC
+   6. SAVING LOGIC
    ========================================================================== */
 async function captureHandler(target) {
   if (!target) return;
   capturedElement = target;
-  target.style.border = "thick solid #fc0303"; 
+  
+  if (removeHoverHighlight) removeHoverHighlight();
+  removeHoverHighlight = highlight(target, '#f39c12'); 
 
   const fingerprint = generateFingerprint(target);
-
-  let displaySelector = target.tagName.toLowerCase();
-  if (fingerprint.ariaLabel) displaySelector = `[aria-label="${fingerprint.ariaLabel}"]`;
-  else if (fingerprint.id) displaySelector = `#${fingerprint.id}`;
-  else if (fingerprint.structural) displaySelector = fingerprint.structural;
+  const fullPathSelector = generateFullPath(target);
 
   if (await quickCaptureCheck(fingerprint)) {
-    showStatusDialog("Trigger Already Exists.", 3000);
-    target.style.border = "";
+    setBannerState('ERROR', t('trigger_exists'));
+    speak(t('trigger_exists'));
+    if (removeHoverHighlight) removeHoverHighlight();
     return;
   }
 
   const newTrigger = { 
-    selector: displaySelector, 
+    selector: fullPathSelector, 
     shortcut: '', 
     entryType: 'quick-capture',
     fingerprint: fingerprint 
@@ -355,8 +522,9 @@ async function saveNewTrigger(triggerObj) {
   storedMappings.push(triggerObj);
   await saveMappings(storedMappings);
   
-  showStatusDialog("Element Captured. Press shortcut keys now...", 0);
-  isRecordingState = true;
+  isRecordingState = true; 
+  setBannerState('RECORDING'); 
+  speak(t('press_keys'));
 }
 
 // --- UTILS ---
@@ -382,38 +550,6 @@ function saveMappings(mappings) {
       });
     } catch (e) { resolve(false); }
   });
-}
-
-function showStatusDialog(text, duration = 0) {
-  speak(text);
-  let dialog = document.getElementById('ks-status-dialog');
-  if (!dialog) {
-    dialog = document.createElement('div');
-    dialog.id = 'ks-status-dialog';
-    Object.assign(dialog.style, {
-      position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
-      backgroundColor: '#333', color: '#fff', padding: '12px 24px',
-      borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-      zIndex: '2147483647', fontFamily: 'system-ui, sans-serif',
-      fontSize: '16px', fontWeight: '600', textAlign: 'center',
-      pointerEvents: 'none', transition: 'opacity 0.2s'
-    });
-    document.body.appendChild(dialog);
-  }
-  dialog.textContent = text;
-  dialog.style.opacity = '1';
-  dialog.style.display = 'block';
-  if (dialog._timeoutId) clearTimeout(dialog._timeoutId);
-  if (duration > 0) {
-    dialog._timeoutId = setTimeout(() => {
-      dialog.style.opacity = '0';
-      setTimeout(() => { dialog.style.display = 'none'; }, 200);
-    }, duration);
-  }
-}
-function hideStatusDialog() {
-  const dialog = document.getElementById('ks-status-dialog');
-  if (dialog) { dialog.style.opacity = '0'; setTimeout(() => { dialog.style.display = 'none'; }, 200); }
 }
 
 // --- MESSAGING ---

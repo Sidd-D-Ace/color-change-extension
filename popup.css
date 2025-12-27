@@ -30,6 +30,55 @@ header {
 h1 { font-size: 18px; margin: 0; font-weight: 700; color: var(--text-main); }
 #desc { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
 
+/* --- NEW: PICKER HERO BUTTON --- */
+.picker-hero-btn {
+  width: 100%;
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  transition: background 0.2s;
+}
+.picker-hero-btn:hover { background: var(--primary-hover); }
+
+/* --- NEW: STATIC HELP CARD --- */
+.static-help-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 20px;
+}
+
+.help-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  padding: 4px 0;
+  border-bottom: 1px solid #edf2f7;
+}
+.help-row:last-child { border-bottom: none; }
+
+.help-label { color: var(--text-muted); font-weight: 500; }
+.help-key { 
+  font-family: monospace; 
+  font-weight: 700; 
+  color: var(--text-main); 
+  background: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
 /* --- Table & Row Cards --- */
 table { 
   width: 100%; border-collapse: separate; border-spacing: 0 16px; /* Spacing between cards */
@@ -103,10 +152,10 @@ input.shortcut.recording { background-color: #fef2f2; border-color: var(--danger
 .deleteBtn:hover { color: var(--danger); }
 
 #addBtn { 
-  background: var(--primary); color: #fff; border: none; width: 100%; 
+  background: var(--surface); color: var(--primary); border: 1px dashed var(--primary); width: 100%; 
   padding: 10px; font-size: 14px; font-weight: 600; border-radius: 6px; cursor: pointer; margin-top: 8px;
 }
-#addBtn:hover { background: var(--primary-hover); }
+#addBtn:hover { background: #eff6ff; }
 
 .controls { 
   display: flex; justify-content: space-between; margin-top: 16px; 
@@ -125,3 +174,21 @@ input.shortcut.recording { background-color: #fef2f2; border-color: var(--danger
 #readAllBtn:hover { background: #dbeafe; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0; }
+
+/* --- NEW: LANGUAGE DROPDOWN --- */
+.lang-dropdown {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  background-color: #f9fafb;
+  color: #374151;
+  cursor: pointer;
+  margin-bottom: 4px; /* Space between drop and button */
+  font-family: 'Segoe UI', sans-serif;
+}
+.lang-dropdown:focus {
+  outline: none;
+  border-color: var(--primary);
+  background-color: #fff;
+}
